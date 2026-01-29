@@ -1,0 +1,12 @@
+model Category {
+  id   String @id @default(cuid())
+  name String @unique
+
+  // many-to-many with tutor profiles via join table
+  tutorLinks TutorCategory[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+

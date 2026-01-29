@@ -1,0 +1,57 @@
+model TutorProfile {
+  id            String  @id @default(cuid())
+  user          User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId        String  @unique
+
+  bio           String?
+  hourlyRate    Float   @default(0)
+  experienceYrs Int     @default(0)
+  location      String?
+  languages     String? // store as CSV or JSON string if you want
+  profileImage  String?
+
+  // Public listing fields
+  avgRating     Float   @default(0)
+  totalReviews  Int     @default(0)
+
+  // Relations
+  categories    TutorCategory[]
+  availability  TutorAvailability[]
+  bookings      Booking[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([hourlyRate])
+  @@index([avgRating])
+}
+
+model TutorAvailability {
+  id             String        @id @default(cuid())
+  tutorProfile   TutorProfile  @relation(fields: [tutorProfileId], references: [id], onDelete: Cascade)
+  tutorProfileId String
+
+  startTime      DateTime
+  endTime        DateTime
+  isBooked       Boolean       @default(false)
+
+  // ✅ Opposite relation (add this)
+  bookings       Booking[]     // one slot can be linked to many bookings (or 1, depending on your rules)
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([tutorProfileId])
+  @@index([startTime, endTime])
+}
+model TutorCategory {
+  id            String       @id @default(cuid())
+  tutorProfile  TutorProfile @relation(fields: [tutorProfileId], references: [id], onDelete: Cascade)
+  tutorProfileId String
+  category      Category     @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  categoryId    String
+
+  @@unique([tutorProfileId, categoryId])
+  @@index([categoryId])
+}
+

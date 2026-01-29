@@ -1,0 +1,23 @@
+model Review {
+  id String @id @default(cuid())
+
+  booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  bookingId String  @unique
+
+  // Student gives review
+  student   User   @relation("StudentReviews", fields: [studentId], references: [id], onDelete: Cascade)
+  studentId String
+
+  // Tutor receives review
+  tutor   User   @relation("TutorReviews", fields: [tutorId], references: [id], onDelete: Cascade)
+  tutorId String
+
+  rating   Int    // 1..5 (validate in app layer)
+  comment  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tutorId])
+  @@index([rating])
+}
