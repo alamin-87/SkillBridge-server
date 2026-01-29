@@ -1,4 +1,3 @@
-
 import type { NextFunction, Request, Response } from "express";
 import { auth } from "../lib/auth";
 import type { UserRole } from "../types/user/userType";
@@ -31,10 +30,10 @@ const authMiddleWare = (...roles: UserRole[]) => {
         role: session.user.role as string,
         emailVerified: session.user.emailVerified,
       };
-      if (!roles.length && !roles.includes(req.user.role as UserRole)) {
+      if (roles.length && !roles.includes(req.user.role as UserRole)) {
         return res.status(403).json({ error: "Forbidden" });
       }
-      // console.log(session);
+      console.log(session);
       next();
     } catch (error) {
       next(error);
