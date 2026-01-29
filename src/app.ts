@@ -9,6 +9,7 @@ import { CategoryRoutes } from "./modules/Categories/category.route";
 import { TutorCategoryRoutes } from "./modules/tutors/tutorCategory.route";
 import { AvailabilityRoutes } from "./modules/availability/availability.route";
 import { BookingRoutes } from "./modules/bookings/booking.route";
+import { ReviewRoutes } from "./modules/reviews/review.route";
 const app = express();
 app.use(express.json());
 app.use(
@@ -25,6 +26,7 @@ app.use("/api/categories", CategoryRoutes);
 app.use("/api/tutorCategories", TutorCategoryRoutes);
 app.use("/api", AvailabilityRoutes);
 app.use("/api/bookings", BookingRoutes);
+app.use("/api/reviews", ReviewRoutes);
 app.get("/", (req, res) => {
   res.send("SkillBridge");
 });
