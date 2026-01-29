@@ -130,9 +130,70 @@ const getBooking = async (bookingId: string, userId: string, role: string | unde
 
   return booking;
 };
+const cancelBooking = async (
+  bookingId: string,
+  userId: string,
+  role: "STUDENT" | "TUTOR" | "ADMIN",
+  reason?: string
+) => {
+  return prisma.$transaction(async (tx) => {
+    const booking = await tx.booking.findUnique({
+      where: { id: bookingId },
+    });
 
+    if (!booking) throw new Error("Booking not found");
+
+    // ✅ access: student/tutor/admin
+    if (role !== "ADMIN" && booking.studentId !== userId && booking.tutorId !== userId) {
+      throw new Error("Not allowed");
+    }
+
+    // if already cancelled, just return it (idempotent)
+    if (booking.status === "CANCELLED") return booking;
+
+    // ✅ unlock slot if exists
+    if (booking.availabilityId) {
+      await tx.tutorAvailability.update({
+        where: { id: booking.availabilityId },
+        data: { isBooked: false },
+      });
+    }
+
+    // ✅ cancel booking
+    return tx.booking.update({
+      where: { id: bookingId },
+      data: {
+        status: "CANCELLED",
+        cancelledById: userId,
+        cancelReason: reason ?? null,
+      },
+    });
+  });
+};
+
+const completeBooking = async (bookingId: string, tutorId: string) => {
+  const booking = await prisma.booking.findUnique({
+    where: { id: bookingId },
+  });
+
+  if (!booking) throw new Error("Booking not found");
+
+  // ✅ tutor only (must match booking tutor)
+  if (booking.tutorId !== tutorId) throw new Error("Not allowed");
+
+  if (booking.status !== "CONFIRMED") {
+    throw new Error("Only CONFIRMED bookings can be completed");
+  }
+
+  return prisma.booking.update({
+    where: { id: bookingId },
+    data: { status: "COMPLETED" },
+  });
+};
 export const BookingService = {
   createBooking,
   getAllBookings,
   getBooking,
+  cancelBooking,
+  completeBooking
 };
