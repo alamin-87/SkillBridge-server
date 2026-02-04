@@ -10,6 +10,7 @@ import { TutorCategoryRoutes } from "./modules/tutors/tutorCategory.route";
 import { AvailabilityRoutes } from "./modules/availability/availability.route";
 import { BookingRoutes } from "./modules/bookings/booking.route";
 import { ReviewRoutes } from "./modules/reviews/review.route";
+import { UserRoutes } from "./modules/users/user.route";
 const app = express();
 app.use(express.json());
 app.use(
@@ -21,6 +22,7 @@ app.use(
   })
 );
 app.all("/api/auth/*splat", toNodeHandler(auth));
+app.use("/api/auth", UserRoutes);
 app.use("/api/tutor", tutorsRouter);
 app.use("/api/categories", CategoryRoutes);
 app.use("/api/tutorCategories", TutorCategoryRoutes);
