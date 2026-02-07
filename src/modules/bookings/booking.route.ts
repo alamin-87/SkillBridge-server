@@ -5,9 +5,9 @@ import { UserRole } from "../../types/user/userType";
 
 const router = Router();
 
-router.post("/", authMiddleWare(UserRole.TUTOR), BookingController.create);
-router.get("/", authMiddleWare(UserRole.TUTOR), BookingController.getAll);
-router.get("/:id", authMiddleWare(UserRole.TUTOR), BookingController.get);
+router.post("/", authMiddleWare(UserRole.TUTOR,UserRole.STUDENT), BookingController.create);
+router.get("/", authMiddleWare(UserRole.TUTOR,UserRole.STUDENT), BookingController.getAll);
+router.get("/:id", authMiddleWare(UserRole.TUTOR,UserRole.STUDENT), BookingController.get);
 router.patch(
   "/:id/cancel",
   authMiddleWare(UserRole.TUTOR),

@@ -2,7 +2,7 @@ import type { Request, Response } from "express";
 import { TutorCategoryService } from "./tutorCategory.service";
 
 export const TutorCategoryController = {
-   create: async (req: Request, res: Response) => {
+  create: async (req: Request, res: Response) => {
     const { tutorProfileId, categoryId } = req.body;
 
     if (typeof tutorProfileId !== "string") {
@@ -21,7 +21,7 @@ export const TutorCategoryController = {
 
     const data = await TutorCategoryService.createTutorCategory(
       tutorProfileId,
-      categoryId
+      categoryId,
     );
 
     return res.status(201).json({
@@ -43,7 +43,14 @@ export const TutorCategoryController = {
       data,
     });
   },
-   deleteOne: async (req: Request, res: Response) => {
+  update: async (req: Request, res: Response) => {
+    const data = await TutorCategoryService.updateCategory(
+      req.params.id as string,
+      req.body.name,
+    );
+    res.json({ success: true, message: "Category updated", data });
+  },
+  deleteOne: async (req: Request, res: Response) => {
     const { tutorProfileId, categoryId } = req.params;
 
     if (typeof tutorProfileId !== "string" || typeof categoryId !== "string") {
@@ -54,7 +61,10 @@ export const TutorCategoryController = {
     }
 
     try {
-      const data = await TutorCategoryService.deleteTutorCategory(tutorProfileId, categoryId);
+      const data = await TutorCategoryService.deleteTutorCategory(
+        tutorProfileId,
+        categoryId,
+      );
       return res.status(200).json({
         success: true,
         message: "Category removed from tutor successfully",

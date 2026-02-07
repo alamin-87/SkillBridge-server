@@ -4,19 +4,16 @@ import { authMiddleWare } from "../../middleware/auth";
 import { UserRole } from "../../types/user/userType";
 
 const router = Router();
-
-// assign category to tutor (TUTOR only)
+router.get(
+  "/:tutorProfileId",
+  TutorCategoryController.getAll
+);
 router.post(
   "/",
   authMiddleWare(UserRole.TUTOR),
   TutorCategoryController.create
 );
-
-// get all categories of a tutor profile (public or protected – your choice)
-router.get(
-  "/:tutorProfileId",
-  TutorCategoryController.getAll
-);
+router.patch("/:tutorProfileId", authMiddleWare(UserRole.TUTOR), TutorCategoryController.update);
 router.delete(
   "/:tutorProfileId/:categoryId",
   TutorCategoryController.deleteOne

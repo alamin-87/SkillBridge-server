@@ -22,7 +22,7 @@ app.use(
   })
 );
 app.all("/api/auth/*splat", toNodeHandler(auth));
-app.use("/api/auth", UserRoutes);
+app.use("/api/user", UserRoutes);
 app.use("/api/tutor", tutorsRouter);
 app.use("/api/categories", CategoryRoutes);
 app.use("/api/tutorCategories", TutorCategoryRoutes);

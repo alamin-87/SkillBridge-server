@@ -4,15 +4,15 @@ import { UserRole } from "../../types/user/userType";
 import { TutorsController } from "./tutors.controller";
 const router = express.Router();
 router.get("/", TutorsController.getAll);
-router.get("/:id", TutorsController.getTutorById);
 router.get(
   "/profile",
-  authMiddleWare(UserRole.STUDENT),
+  authMiddleWare(UserRole.TUTOR),
   TutorsController.getMyTutorProfile,
 );
+router.get("/:id", TutorsController.getTutorById);
 router.post(
   "/",
-  authMiddleWare(UserRole.STUDENT, UserRole.ADMIN),
+  authMiddleWare(UserRole.TUTOR, UserRole.ADMIN),
   TutorsController.createPost,
 );
 router.patch(

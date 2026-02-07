@@ -35,7 +35,6 @@ const getTutorById = async (req: Request, res: Response) => {
 const getMyTutorProfile = async (req: Request, res: Response) => {
   try {
     const id = req.user?.id;
-    console.log(req.user?.id);
     if (!id) {
       return res.status(401).json({ success: false, message: "Unauthorized" });
     }

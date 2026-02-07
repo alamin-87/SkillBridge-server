@@ -2,7 +2,7 @@ import { prisma } from "../../lib/prisma";
 
 const createTutorCategory = async (
   tutorProfileId: string,
-  categoryId: string
+  categoryId: string,
 ) => {
   return prisma.tutorCategory.create({
     data: {
@@ -20,7 +20,13 @@ const getAllTutorCategories = async (tutorProfileId: string) => {
     },
   });
 };
-const deleteTutorCategory = async (tutorProfileId: string, categoryId: string) => {
+const updateCategory = (id: string, name: string) =>
+  prisma.category.update({ where: { id }, data: { name } });
+
+const deleteTutorCategory = async (
+  tutorProfileId: string,
+  categoryId: string,
+) => {
   return prisma.tutorCategory.delete({
     where: {
       tutorProfileId_categoryId: { tutorProfileId, categoryId },
@@ -30,5 +36,6 @@ const deleteTutorCategory = async (tutorProfileId: string, categoryId: string) =
 export const TutorCategoryService = {
   createTutorCategory,
   getAllTutorCategories,
-  deleteTutorCategory
+  updateCategory,
+  deleteTutorCategory,
 };
