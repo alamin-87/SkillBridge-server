@@ -5,7 +5,7 @@ import { UserRole } from "../../types/user/userType";
 
 const router = Router();
 
-router.post("/", authMiddleWare(UserRole.TUTOR,UserRole.STUDENT), BookingController.create);
+router.post("/", authMiddleWare(UserRole.TUTOR,UserRole.STUDENT,UserRole.ADMIN), BookingController.create);
 router.get("/", authMiddleWare(UserRole.TUTOR,UserRole.STUDENT), BookingController.getAll);
 router.get("/:id", authMiddleWare(UserRole.TUTOR,UserRole.STUDENT), BookingController.get);
 router.patch(

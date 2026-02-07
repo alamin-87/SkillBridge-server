@@ -6,6 +6,22 @@ const getUser = (userId: string) => {
     select: { id: true, name: true, email: true, role: true, status: true, image: true, phone: true },
   });
 };
+const getUserById = (id: string) => {
+  return prisma.user.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      status: true,
+      image: true,
+      phone: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
+};
 
 const updateUser = (userId: string, payload: { name?: string; image?: string | null; phone?: string | null }) => {
   return prisma.user.update({
@@ -15,4 +31,4 @@ const updateUser = (userId: string, payload: { name?: string; image?: string | n
   });
 };
 
-export const UserService = { getUser, updateUser };
+export const UserService = { getUser, updateUser, getUserById };

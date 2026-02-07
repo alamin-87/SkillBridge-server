@@ -11,6 +11,7 @@ import { AvailabilityRoutes } from "./modules/availability/availability.route";
 import { BookingRoutes } from "./modules/bookings/booking.route";
 import { ReviewRoutes } from "./modules/reviews/review.route";
 import { UserRoutes } from "./modules/users/user.route";
+import { AdminRoutes } from "./modules/admin/admin.route";
 const app = express();
 app.use(express.json());
 app.use(
@@ -23,6 +24,7 @@ app.use(
 );
 app.all("/api/auth/*splat", toNodeHandler(auth));
 app.use("/api/user", UserRoutes);
+app.use("/api/admin", AdminRoutes);
 app.use("/api/tutor", tutorsRouter);
 app.use("/api/categories", CategoryRoutes);
 app.use("/api/tutorCategories", TutorCategoryRoutes);
