@@ -4,9 +4,9 @@ import { prisma } from "./prisma";
 
 export const auth = betterAuth({
   database: prismaAdapter(prisma, {
-    provider: "postgresql", // or "mysql", "postgresql", ...etc
+    provider: "postgresql",
   }),
-  trustedOrigins: [process.env.app_URL!, "http://localhost:3000"],
+  trustedOrigins: [process.env.app_URL!, "https://skillbridge-client-black.vercel.app"],
   user: {
     additionalFields: {
       role: {
@@ -39,4 +39,18 @@ export const auth = betterAuth({
       clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
     },
   },
+  //   session: {
+  //   cookieCache: {
+  //     enabled: true,
+  //     maxAge: 5 * 60, // 5 minutes
+  //   },
+  // },
+  // advanced: {
+  //   cookiePrefix: "better-auth",
+  //   useSecureCookies: process.env.NODE_ENV === "production",
+  //   crossSubDomainCookies: {
+  //     enabled: false,
+  //   },
+  //   disableCSRFCheck: true, // Allow requests without Origin header (Postman, mobile apps, etc.)
+  // },
 });

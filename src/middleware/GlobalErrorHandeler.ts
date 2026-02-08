@@ -58,5 +58,4 @@ function errorHandler(
   res.status(statusCode);
   res.json({ error: errorMessage, details: errorDetails });
 }
-module.exports = errorHandler;
 export default errorHandler;
