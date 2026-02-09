@@ -51,7 +51,7 @@ export const ReviewController = {
     return res.status(200).json({ success: true, data });
   },
 
-  // ✅ student only
+  //  student only
   getAllMine: async (req: Request, res: Response) => {
     const data = await ReviewService.getMyReviews(req.user!.id);
     return res.status(200).json({ success: true, data });

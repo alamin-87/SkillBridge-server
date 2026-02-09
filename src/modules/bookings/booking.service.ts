@@ -143,7 +143,7 @@ const cancelBooking = async (
 
     if (!booking) throw new Error("Booking not found");
 
-    // ✅ access: student/tutor/admin
+    //  access: student/tutor/admin
     if (role !== "ADMIN" && booking.studentId !== userId && booking.tutorId !== userId) {
       throw new Error("Not allowed");
     }
@@ -151,7 +151,7 @@ const cancelBooking = async (
     // if already cancelled, just return it (idempotent)
     if (booking.status === "CANCELLED") return booking;
 
-    // ✅ unlock slot if exists
+    //  unlock slot if exists
     if (booking.availabilityId) {
       await tx.tutorAvailability.update({
         where: { id: booking.availabilityId },
@@ -159,7 +159,7 @@ const cancelBooking = async (
       });
     }
 
-    // ✅ cancel booking
+    //  cancel booking
     return tx.booking.update({
       where: { id: bookingId },
       data: {

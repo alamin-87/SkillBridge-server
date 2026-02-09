@@ -1,12 +1,16 @@
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { prisma } from "./prisma";
-
+const isProd = process.env.NODE_ENV === "production";
 export const auth = betterAuth({
   database: prismaAdapter(prisma, {
     provider: "postgresql",
   }),
-  trustedOrigins: [process.env.app_URL!, "https://skillbridge-client-black.vercel.app"],
+  trustedOrigins: [
+    "http://localhost:3000",
+    process.env.APP_URL!,
+    "https://skillbridge-client-delta.vercel.app",
+  ].filter(Boolean),
   user: {
     additionalFields: {
       role: {
@@ -26,31 +30,31 @@ export const auth = betterAuth({
       },
     },
   },
-    emailAndPassword: {
+  emailAndPassword: {
     enabled: true,
     autoSignIn: false,
     requireEmailVerification: false,
   },
-    socialProviders: {
+  socialProviders: {
     google: {
-      prompt:"select_account consent",
-       accessType: "offline", 
+      prompt: "select_account consent",
+      accessType: "offline",
       clientId: process.env.GOOGLE_CLIENT_ID as string,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
     },
   },
-  //   session: {
-  //   cookieCache: {
-  //     enabled: true,
-  //     maxAge: 5 * 60, // 5 minutes
-  //   },
-  // },
-  // advanced: {
-  //   cookiePrefix: "better-auth",
-  //   useSecureCookies: process.env.NODE_ENV === "production",
-  //   crossSubDomainCookies: {
-  //     enabled: false,
-  //   },
-  //   disableCSRFCheck: true, // Allow requests without Origin header (Postman, mobile apps, etc.)
-  // },
+  session: {
+    cookieCache: {
+      enabled: true,
+      maxAge: 5 * 60, 
+    },
+  },
+  advanced: {
+    cookiePrefix: "better-auth",
+    useSecureCookies: process.env.NODE_ENV === "production",
+    crossSubDomainCookies: {
+      enabled: false,
+    },
+    disableCSRFCheck: true, 
+  },
 });

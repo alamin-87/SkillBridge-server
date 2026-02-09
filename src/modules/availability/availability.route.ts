@@ -4,8 +4,6 @@ import { authMiddleWare } from "../../middleware/auth";
 import { UserRole } from "../../types/user/userType";
 
 const router = Router();
-
-// Tutor only
 router.post("/availability", authMiddleWare(UserRole.TUTOR), AvailabilityController.create);
 router.get("/availability/:tutorProfileId", authMiddleWare(UserRole.TUTOR), AvailabilityController.getAll);
 router.patch("/tutor/availability/:id", authMiddleWare(UserRole.TUTOR), AvailabilityController.update);

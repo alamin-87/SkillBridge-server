@@ -2,31 +2,22 @@ import type { Request, Response } from "express";
 import { AdminService } from "./admin.service";
 
 export const AdminController = {
-  // ✅ GET /api/admin
   getDashboardStats: async (_req: Request, res: Response) => {
     const data = await AdminService.getDashboardStats();
     res.json({ success: true, data });
   },
-
-  // ✅ GET /api/admin/users
   getAllUsers: async (_req: Request, res: Response) => {
     const data = await AdminService.getAllUsers();
     res.json({ success: true, data });
   },
-
-  // ✅ PATCH /api/admin/users/:id  -> ban/unban + role update
   updateUserStatusOrRole: async (req: Request, res: Response) => {
     const { status, role } = req.body;
-
-    // status is optional but if provided must be correct
     if (status !== undefined && status !== "ACTIVE" && status !== "BANNED") {
       return res.status(400).json({
         success: false,
         message: "status must be ACTIVE or BANNED",
       });
     }
-
-    // role is optional but if provided must be correct
     if (role !== undefined && role !== "STUDENT" && role !== "TUTOR" && role !== "ADMIN") {
       return res.status(400).json({
         success: false,
@@ -43,13 +34,11 @@ export const AdminController = {
     });
   },
 
-  // ✅ GET /api/admin/bookings
   getAllBookings: async (_req: Request, res: Response) => {
     const data = await AdminService.getAllBookings();
     res.json({ success: true, data });
   },
 
-  // ✅ Categories (Admin Manage)
   getAllCategories: async (_req: Request, res: Response) => {
     const data = await AdminService.getAllCategories();
     res.json({ success: true, data });

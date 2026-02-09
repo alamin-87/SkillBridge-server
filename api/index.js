@@ -263,11 +263,17 @@ var adapter = new PrismaPg({ connectionString });
 var prisma = new PrismaClient({ adapter });
 
 // src/lib/auth.ts
+var isProd = process.env.NODE_ENV === "production";
 var auth = betterAuth({
   database: prismaAdapter(prisma, {
     provider: "postgresql"
   }),
-  trustedOrigins: [process.env.app_URL, "https://skillbridge-client-black.vercel.app"],
+  trustedOrigins: [
+    "http://localhost:3000",
+    process.env.APP_URL,
+    // https://skillbridge-client-delta.vercel.app
+    "https://skillbridge-client-delta.vercel.app"
+  ].filter(Boolean),
   user: {
     additionalFields: {
       role: {
@@ -299,21 +305,23 @@ var auth = betterAuth({
       clientId: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET
     }
+  },
+  session: {
+    cookieCache: {
+      enabled: true,
+      maxAge: 5 * 60
+      // 5 minutes
+    }
+  },
+  advanced: {
+    cookiePrefix: "better-auth",
+    useSecureCookies: process.env.NODE_ENV === "production",
+    crossSubDomainCookies: {
+      enabled: false
+    },
+    disableCSRFCheck: true
+    // Allow requests without Origin header (Postman, mobile apps, etc.)
   }
-  //   session: {
-  //   cookieCache: {
-  //     enabled: true,
-  //     maxAge: 5 * 60, // 5 minutes
-  //   },
-  // },
-  // advanced: {
-  //   cookiePrefix: "better-auth",
-  //   useSecureCookies: process.env.NODE_ENV === "production",
-  //   crossSubDomainCookies: {
-  //     enabled: false,
-  //   },
-  //   disableCSRFCheck: true, // Allow requests without Origin header (Postman, mobile apps, etc.)
-  // },
 });
 
 // src/middleware/NotFound.ts
@@ -408,6 +416,33 @@ var authMiddleWare = (...roles) => {
 };
 
 // src/modules/tutors/tutors.service.ts
+var parseLanguages = (value) => {
+  if (!value) return [];
+  if (Array.isArray(value)) {
+    return value.map(String).map((s) => s.trim()).filter(Boolean);
+  }
+  if (typeof value === "string") {
+    const s = value.trim();
+    if (s.startsWith("[") && s.endsWith("]")) {
+      try {
+        const arr = JSON.parse(s);
+        if (Array.isArray(arr)) {
+          return arr.map(String).map((x) => x.trim()).filter(Boolean);
+        }
+      } catch {
+      }
+    }
+    return s.split(",").map((x) => x.trim()).filter(Boolean);
+  }
+  return [];
+};
+var serializeTutorProfile = (profile) => {
+  if (!profile) return profile;
+  return {
+    ...profile,
+    languages: parseLanguages(profile.languages)
+  };
+};
 var getAllTutors = async (query) => {
   const page = query.page ?? 1;
   const limit = query.limit ?? 10;
@@ -490,20 +525,43 @@ var getMyTutorProfile = async (userId) => {
 var updateTutorProfile = async (userId, payload) => {
   const data = {};
   if (payload.bio !== void 0) data.bio = payload.bio;
-  if (payload.hourlyRate !== void 0)
-    data.hourlyRate = Number(payload.hourlyRate);
-  if (payload.experienceYrs !== void 0)
-    data.experienceYrs = Number(payload.experienceYrs);
+  if (payload.hourlyRate !== void 0) data.hourlyRate = Number(payload.hourlyRate);
+  if (payload.experienceYrs !== void 0) data.experienceYrs = Number(payload.experienceYrs);
   if (payload.location !== void 0) data.location = payload.location;
+  if (payload.profileImage !== void 0) data.profileImage = payload.profileImage;
+  const normalizeLanguages = (input) => {
+    let langs = [];
+    if (Array.isArray(input)) {
+      langs = input;
+    } else if (typeof input === "string") {
+      const str = input.trim();
+      if (str.startsWith("[") && str.endsWith("]")) {
+        try {
+          const parsed = JSON.parse(str);
+          if (Array.isArray(parsed)) langs = parsed;
+          else langs = [str];
+        } catch {
+          langs = str.split(",");
+        }
+      } else {
+        langs = str.split(",");
+      }
+    }
+    const seen = /* @__PURE__ */ new Set();
+    return langs.filter((x) => typeof x === "string").map((x) => x.trim()).filter(Boolean).filter((x) => {
+      const key = x.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  };
   if (payload.languages !== void 0) {
-    data.languages = Array.isArray(payload.languages) ? JSON.stringify(payload.languages) : payload.languages;
+    const clean = normalizeLanguages(payload.languages);
+    data.languages = JSON.stringify(clean);
   }
-  if (payload.profileImage !== void 0)
-    data.profileImage = payload.profileImage;
   return prisma.$transaction(async (tx) => {
     const tutorProfile = await tx.tutorProfile.upsert({
       where: { userId },
-      // userId is @unique ✅
       update: data,
       create: {
         userId,
@@ -521,7 +579,6 @@ var updateTutorProfile = async (userId, payload) => {
       for (const name of categoryNames) {
         const category = await tx.category.upsert({
           where: { name },
-          // name is unique ✅
           update: {},
           create: { name }
         });
@@ -533,12 +590,14 @@ var updateTutorProfile = async (userId, payload) => {
         });
       }
     }
-    return tx.tutorProfile.findUnique({
+    const profile = await tx.tutorProfile.findUnique({
       where: { id: tutorProfile.id },
       include: {
-        categories: { include: { category: true } }
+        categories: { include: { category: true } },
+        user: true
       }
     });
+    return serializeTutorProfile(profile);
   });
 };
 var TutorsService = {
@@ -1606,12 +1665,26 @@ var AdminRoutes = router8;
 // src/app.ts
 var app = express2();
 app.use(express2.json());
+var allowedOrigins = [
+  process.env.APP_URL || "http://localhost:3000",
+  process.env.PROD_APP_URL
+  // Production frontend URL
+].filter(Boolean);
 app.use(
   cors({
-    origin: process.env.app_URL || "https://skillbridge-client-black.vercel.app",
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+      const isAllowed = allowedOrigins.includes(origin) || /^https:\/\/next-blog-client.*\.vercel\.app$/.test(origin) || /^https:\/\/.*\.vercel\.app$/.test(origin);
+      if (isAllowed) {
+        callback(null, true);
+      } else {
+        callback(new Error(`Origin ${origin} not allowed by CORS`));
+      }
+    },
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"]
+    allowedHeaders: ["Content-Type", "Authorization", "Cookie"],
+    exposedHeaders: ["Set-Cookie"]
   })
 );
 app.all("/api/auth/*splat", toNodeHandler(auth));

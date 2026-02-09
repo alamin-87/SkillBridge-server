@@ -48,8 +48,6 @@ const updateAvailability = async (
   if (!slot) {
     throw new Error("Availability not found");
   }
-
-  // ❌ prevent updating booked slots
   if (slot.isBooked) {
     throw new Error("Booked availability cannot be updated");
   }

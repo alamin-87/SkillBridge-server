@@ -13,6 +13,51 @@ type TutorListQuery = {
   page?: number | undefined;
   limit?: number | undefined;
 };
+const parseLanguages = (value: any): string[] => {
+  if (!value) return [];
+
+  if (Array.isArray(value)) {
+    return value
+      .map(String)
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+
+  if (typeof value === "string") {
+    const s = value.trim();
+
+    // JSON string: '["English","Bangla"]'
+    if (s.startsWith("[") && s.endsWith("]")) {
+      try {
+        const arr = JSON.parse(s);
+        if (Array.isArray(arr)) {
+          return arr
+            .map(String)
+            .map((x) => x.trim())
+            .filter(Boolean);
+        }
+      } catch {
+        // ignore -> fallback below
+      }
+    }
+
+    // comma-separated fallback
+    return s
+      .split(",")
+      .map((x) => x.trim())
+      .filter(Boolean);
+  }
+
+  return [];
+};
+
+const serializeTutorProfile = (profile: any) => {
+  if (!profile) return profile;
+  return {
+    ...profile,
+    languages: parseLanguages(profile.languages),
+  };
+};
 const getAllTutors = async (query: TutorListQuery) => {
   const page = query.page ?? 1;
   const limit = query.limit ?? 10;
@@ -89,51 +134,24 @@ const createTutor = async (
   return result;
 };
 const getMyTutorProfile = async (userId: string) => {
-  // If userId is not actually unique in schema, use findFirst instead.
   const result = await prisma.tutorProfile.findUnique({
     where: { userId },
     include: {
-      user: { select: { id: true, name: true, email: true, image: true, role: true } },
+      user: {
+        select: { id: true, name: true, email: true, image: true, role: true },
+      },
       categories: { include: { category: true } },
       availability: true,
     },
   });
 
   if (!result) {
-    // mimic findUniqueOrThrow behavior explicitly
     const err: any = new Error("Tutor profile not found");
     err.code = "P2025";
     throw err;
   }
-
   return result;
 };
-// export const updateTutorProfile = async (userId: string, payload: any) => {
-//   const data: any = {};
-
-//   if (payload.bio !== undefined) data.bio = payload.bio;
-//   if (payload.hourlyRate !== undefined)
-//     data.hourlyRate = Number(payload.hourlyRate);
-//   if (payload.experienceYrs !== undefined)
-//     data.experienceYrs = Number(payload.experienceYrs);
-//   if (payload.location !== undefined) data.location = payload.location;
-//   if (payload.languages !== undefined) {
-//     data.languages = Array.isArray(payload.languages)
-//       ? JSON.stringify(payload.languages)
-//       : payload.languages;
-//   }
-//   if (payload.profileImage !== undefined)
-//     data.profileImage = payload.profileImage;
-
-//   return prisma.tutorProfile.upsert({
-//     where: { userId }, // userId is @unique ✅
-//     update: data,
-//     create: {
-//       userId,
-//       ...data,
-//     },
-//   });
-// };
 export const updateTutorProfile = async (userId: string, payload: any) => {
   const data: any = {};
 
@@ -143,18 +161,54 @@ export const updateTutorProfile = async (userId: string, payload: any) => {
   if (payload.experienceYrs !== undefined)
     data.experienceYrs = Number(payload.experienceYrs);
   if (payload.location !== undefined) data.location = payload.location;
-  if (payload.languages !== undefined) {
-    data.languages = Array.isArray(payload.languages)
-      ? JSON.stringify(payload.languages)
-      : payload.languages;
-  }
   if (payload.profileImage !== undefined)
     data.profileImage = payload.profileImage;
 
+  // normalize payload languages into string[]
+  const normalizeLanguages = (input: any): string[] => {
+    let langs: string[] = [];
+
+    if (Array.isArray(input)) {
+      langs = input;
+    } else if (typeof input === "string") {
+      const str = input.trim();
+
+      if (str.startsWith("[") && str.endsWith("]")) {
+        try {
+          const parsed = JSON.parse(str);
+          if (Array.isArray(parsed)) langs = parsed;
+          else langs = [str];
+        } catch {
+          langs = str.split(",");
+        }
+      } else {
+        langs = str.split(",");
+      }
+    }
+
+    const seen = new Set<string>();
+    return langs
+      .filter((x) => typeof x === "string")
+      .map((x) => x.trim())
+      .filter(Boolean)
+      .filter((x) => {
+        const key = x.toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+  };
+
+  // store as JSON string in DB
+  if (payload.languages !== undefined) {
+    const clean = normalizeLanguages(payload.languages);
+    data.languages = JSON.stringify(clean);
+  }
+
   return prisma.$transaction(async (tx) => {
-    // 1️⃣ upsert tutor profile (UNCHANGED behavior)
+    // upsert tutor profile
     const tutorProfile = await tx.tutorProfile.upsert({
-      where: { userId }, // userId is @unique ✅
+      where: { userId },
       update: data,
       create: {
         userId,
@@ -162,7 +216,7 @@ export const updateTutorProfile = async (userId: string, payload: any) => {
       },
     });
 
-    // 2️⃣ OPTIONAL: update categories by NAME
+    // update categories by NAME
     if (payload.categories !== undefined) {
       if (!Array.isArray(payload.categories)) {
         throw new Error("categories must be an array of strings");
@@ -173,15 +227,13 @@ export const updateTutorProfile = async (userId: string, payload: any) => {
         .map((c: string) => c.trim())
         .filter((c: string) => c.length > 0);
 
-      // delete old category links
       await tx.tutorCategory.deleteMany({
         where: { tutorProfileId: tutorProfile.id },
       });
 
-      // recreate categories + links
       for (const name of categoryNames) {
         const category = await tx.category.upsert({
-          where: { name }, // name is unique ✅
+          where: { name },
           update: {},
           create: { name },
         });
@@ -194,16 +246,19 @@ export const updateTutorProfile = async (userId: string, payload: any) => {
         });
       }
     }
-
-    // 3️⃣ return updated profile with categories
-    return tx.tutorProfile.findUnique({
+    //  return updated profile (IMPORTANT: return languages as array)
+    const profile = await tx.tutorProfile.findUnique({
       where: { id: tutorProfile.id },
       include: {
         categories: { include: { category: true } },
+        user: true,
       },
     });
+
+    return serializeTutorProfile(profile);
   });
 };
+
 export const TutorsService = {
   createTutor,
   getTutorById,

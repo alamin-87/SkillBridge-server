@@ -5,8 +5,6 @@ export const AvailabilityController = {
   create: async (req: Request, res: Response) => {
     try {
       const { tutorProfileId, slots } = req.body;
-
-      // ✅ tutorProfileId only
       if (typeof tutorProfileId !== "string") {
         return res.status(400).json({
           success: false,

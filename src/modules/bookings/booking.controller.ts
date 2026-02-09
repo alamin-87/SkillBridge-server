@@ -95,7 +95,6 @@ export const BookingController = {
   },
 
   complete: async (req: Request, res: Response) => {
-    // tutorId comes from logged-in tutor
     const data = await BookingService.completeBooking(req.params.id as string, req.user!.id);
 
     return res.status(200).json({
