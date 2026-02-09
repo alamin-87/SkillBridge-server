@@ -3,12 +3,10 @@ import { TutorsService } from "./tutors.service";
 
 const createPost = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    console.log(req.user);
-    if (!req.user) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
+    if (!req.user) return res.status(401).json({ success: false, message: "Unauthorized" });
+
     const result = await TutorsService.createTutor(req.body, req.user.id);
-    res.status(201).json(result);
+    res.status(201).json({ success: true, data: result, message: "Tutor profile created" });
   } catch (error) {
     next(error);
   }

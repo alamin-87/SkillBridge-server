@@ -271,7 +271,6 @@ var auth = betterAuth({
   trustedOrigins: [
     "http://localhost:3000",
     process.env.APP_URL,
-    // https://skillbridge-client-delta.vercel.app
     "https://skillbridge-client-delta.vercel.app"
   ].filter(Boolean),
   user: {
@@ -310,7 +309,6 @@ var auth = betterAuth({
     cookieCache: {
       enabled: true,
       maxAge: 5 * 60
-      // 5 minutes
     }
   },
   advanced: {
@@ -320,7 +318,6 @@ var auth = betterAuth({
       enabled: false
     },
     disableCSRFCheck: true
-    // Allow requests without Origin header (Postman, mobile apps, etc.)
   }
 });
 
@@ -416,6 +413,25 @@ var authMiddleWare = (...roles) => {
 };
 
 // src/modules/tutors/tutors.service.ts
+function normalizeLanguagesToString(input) {
+  if (input === void 0 || input === null) return null;
+  if (typeof input === "string") return input.trim() || null;
+  if (Array.isArray(input)) {
+    const clean = input.map(String).map((s) => s.trim()).filter(Boolean);
+    return clean.length ? JSON.stringify(clean) : null;
+  }
+  return null;
+}
+function safeFloat(v, fallback = 0) {
+  if (v === void 0 || v === null || v === "") return fallback;
+  const n = typeof v === "number" ? v : Number(String(v).replace(/[^\d.-]/g, ""));
+  return Number.isFinite(n) ? n : fallback;
+}
+function safeInt(v, fallback = 0) {
+  if (v === void 0 || v === null || v === "") return fallback;
+  const n = typeof v === "number" ? Math.trunc(v) : parseInt(String(v).replace(/[^\d-]/g, ""), 10);
+  return Number.isFinite(n) ? n : fallback;
+}
 var parseLanguages = (value) => {
   if (!value) return [];
   if (Array.isArray(value)) {
@@ -497,20 +513,49 @@ var getTutorById = (id) => {
     }
   });
 };
-var createTutor = async (data, userId) => {
-  const result = await prisma.tutorProfile.create({
-    data: {
-      ...data,
-      userId
+var createTutor = async (payload, userId) => {
+  const data = {
+    userId,
+    bio: payload.bio?.trim() || null,
+    location: payload.location?.trim() || null,
+    profileImage: payload.profileImage?.trim() || null,
+    languages: normalizeLanguagesToString(payload.languages),
+    hourlyRate: safeFloat(payload.hourlyRate, 0),
+    experienceYrs: safeInt(payload.experienceYrs, 0)
+  };
+  return prisma.$transaction(async (tx) => {
+    const profile = await tx.tutorProfile.create({ data });
+    const categoryNames = Array.isArray(payload.categories) ? payload.categories.filter((c) => typeof c === "string").map((c) => c.trim()).filter(Boolean) : [];
+    for (const name of categoryNames) {
+      const category = await tx.category.upsert({
+        where: { name },
+        update: {},
+        create: { name }
+      });
+      await tx.tutorCategory.create({
+        data: {
+          tutorProfileId: profile.id,
+          categoryId: category.id
+        }
+      });
     }
+    return tx.tutorProfile.findUnique({
+      where: { id: profile.id },
+      include: {
+        user: { select: { id: true, name: true, email: true, image: true, role: true } },
+        categories: { include: { category: true } },
+        availability: true
+      }
+    });
   });
-  return result;
 };
 var getMyTutorProfile = async (userId) => {
   const result = await prisma.tutorProfile.findUnique({
     where: { userId },
     include: {
-      user: { select: { id: true, name: true, email: true, image: true, role: true } },
+      user: {
+        select: { id: true, name: true, email: true, image: true, role: true }
+      },
       categories: { include: { category: true } },
       availability: true
     }
@@ -525,10 +570,13 @@ var getMyTutorProfile = async (userId) => {
 var updateTutorProfile = async (userId, payload) => {
   const data = {};
   if (payload.bio !== void 0) data.bio = payload.bio;
-  if (payload.hourlyRate !== void 0) data.hourlyRate = Number(payload.hourlyRate);
-  if (payload.experienceYrs !== void 0) data.experienceYrs = Number(payload.experienceYrs);
+  if (payload.hourlyRate !== void 0)
+    data.hourlyRate = Number(payload.hourlyRate);
+  if (payload.experienceYrs !== void 0)
+    data.experienceYrs = Number(payload.experienceYrs);
   if (payload.location !== void 0) data.location = payload.location;
-  if (payload.profileImage !== void 0) data.profileImage = payload.profileImage;
+  if (payload.profileImage !== void 0)
+    data.profileImage = payload.profileImage;
   const normalizeLanguages = (input) => {
     let langs = [];
     if (Array.isArray(input)) {
@@ -611,12 +659,9 @@ var TutorsService = {
 // src/modules/tutors/tutors.controller.ts
 var createPost = async (req, res, next) => {
   try {
-    console.log(req.user);
-    if (!req.user) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
+    if (!req.user) return res.status(401).json({ success: false, message: "Unauthorized" });
     const result = await TutorsService.createTutor(req.body, req.user.id);
-    res.status(201).json(result);
+    res.status(201).json({ success: true, data: result, message: "Tutor profile created" });
   } catch (error) {
     next(error);
   }
@@ -1426,7 +1471,7 @@ var ReviewController = {
     const data = await ReviewService.getTutorReviews(tutorId);
     return res.status(200).json({ success: true, data });
   },
-  // ✅ student only
+  //  student only
   getAllMine: async (req, res) => {
     const data = await ReviewService.getMyReviews(req.user.id);
     return res.status(200).json({ success: true, data });
@@ -1447,7 +1492,15 @@ import { Router as Router6 } from "express";
 var getUser = (userId) => {
   return prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, name: true, email: true, role: true, status: true, image: true, phone: true }
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      status: true,
+      image: true,
+      phone: true
+    }
   });
 };
 var getUserById = (id) => {
@@ -1470,7 +1523,16 @@ var updateUser = (userId, payload) => {
   return prisma.user.update({
     where: { id: userId },
     data: payload,
-    select: { id: true, name: true, email: true, role: true, status: true, image: true, phone: true, updatedAt: true }
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      status: true,
+      image: true,
+      phone: true,
+      updatedAt: true
+    }
   });
 };
 var UserService = { getUser, updateUser, getUserById };
@@ -1580,17 +1642,14 @@ var AdminService = {
 
 // src/modules/admin/admin.controller.ts
 var AdminController = {
-  // ✅ GET /api/admin
   getDashboardStats: async (_req, res) => {
     const data = await AdminService.getDashboardStats();
     res.json({ success: true, data });
   },
-  // ✅ GET /api/admin/users
   getAllUsers: async (_req, res) => {
     const data = await AdminService.getAllUsers();
     res.json({ success: true, data });
   },
-  // ✅ PATCH /api/admin/users/:id  -> ban/unban + role update
   updateUserStatusOrRole: async (req, res) => {
     const { status, role } = req.body;
     if (status !== void 0 && status !== "ACTIVE" && status !== "BANNED") {
@@ -1612,12 +1671,10 @@ var AdminController = {
       data
     });
   },
-  // ✅ GET /api/admin/bookings
   getAllBookings: async (_req, res) => {
     const data = await AdminService.getAllBookings();
     res.json({ success: true, data });
   },
-  // ✅ Categories (Admin Manage)
   getAllCategories: async (_req, res) => {
     const data = await AdminService.getAllCategories();
     res.json({ success: true, data });
@@ -1668,7 +1725,6 @@ app.use(express2.json());
 var allowedOrigins = [
   process.env.APP_URL || "http://localhost:3000",
   process.env.PROD_APP_URL
-  // Production frontend URL
 ].filter(Boolean);
 app.use(
   cors({

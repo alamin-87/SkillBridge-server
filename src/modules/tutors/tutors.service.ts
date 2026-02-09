@@ -13,6 +13,44 @@ type TutorListQuery = {
   page?: number | undefined;
   limit?: number | undefined;
 };
+type CreateTutorPayload = {
+  bio?: string;
+  hourlyRate?: number | string;
+  experienceYrs?: number | string;
+  location?: string;
+  languages?: string[] | string;
+  profileImage?: string | null;
+  categories?: string[];
+};
+
+function normalizeLanguagesToString(input: any): string | null {
+  if (input === undefined || input === null) return null;
+
+  if (typeof input === "string") return input.trim() || null;
+
+  if (Array.isArray(input)) {
+    const clean = input.map(String).map((s) => s.trim()).filter(Boolean);
+    return clean.length ? JSON.stringify(clean) : null;
+  }
+
+  return null;
+}
+
+/** ✅ parse number safely even if user typed "৳500", "500 ", "500.00" */
+function safeFloat(v: any, fallback = 0) {
+  if (v === undefined || v === null || v === "") return fallback;
+  const n = typeof v === "number" ? v : Number(String(v).replace(/[^\d.-]/g, ""));
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function safeInt(v: any, fallback = 0) {
+  if (v === undefined || v === null || v === "") return fallback;
+  const n =
+    typeof v === "number"
+      ? Math.trunc(v)
+      : parseInt(String(v).replace(/[^\d-]/g, ""), 10);
+  return Number.isFinite(n) ? n : fallback;
+}
 const parseLanguages = (value: any): string[] => {
   if (!value) return [];
 
@@ -120,18 +158,52 @@ const getTutorById = (id: string) => {
     },
   });
 };
-const createTutor = async (
-  data: Omit<TutorProfile, "id" | "createdAt" | "updatedAt" | "authorId">,
-  userId: string,
-) => {
-  const result = await prisma.tutorProfile.create({
-    data: {
-      ...data,
-      userId: userId,
-    },
-  });
+export const createTutor = async (payload: CreateTutorPayload, userId: string) => {
+  // ✅ IMPORTANT: only put TutorProfile scalar fields here
+  const data = {
+    userId,
+    bio: payload.bio?.trim() || null,
+    location: payload.location?.trim() || null,
+    profileImage: payload.profileImage?.trim() || null,
+    languages: normalizeLanguagesToString(payload.languages),
+    hourlyRate: safeFloat(payload.hourlyRate, 0),
+    experienceYrs: safeInt(payload.experienceYrs, 0),
+  };
 
-  return result;
+  return prisma.$transaction(async (tx) => {
+    const profile = await tx.tutorProfile.create({ data });
+
+    const categoryNames = Array.isArray(payload.categories)
+      ? payload.categories
+          .filter((c) => typeof c === "string")
+          .map((c) => c.trim())
+          .filter(Boolean)
+      : [];
+
+    for (const name of categoryNames) {
+      const category = await tx.category.upsert({
+        where: { name },
+        update: {},
+        create: { name },
+      });
+
+      await tx.tutorCategory.create({
+        data: {
+          tutorProfileId: profile.id,
+          categoryId: category.id,
+        },
+      });
+    }
+
+    return tx.tutorProfile.findUnique({
+      where: { id: profile.id },
+      include: {
+        user: { select: { id: true, name: true, email: true, image: true, role: true } },
+        categories: { include: { category: true } },
+        availability: true,
+      },
+    });
+  });
 };
 const getMyTutorProfile = async (userId: string) => {
   const result = await prisma.tutorProfile.findUnique({
