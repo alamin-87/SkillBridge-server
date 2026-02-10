@@ -6,7 +6,7 @@ export const CategoryController = {
   create: async (req: Request, res: Response) => {
     const { name } = req.body;
 
-    // strict type validation
+    // type validation
     if (typeof name !== "string") {
       return res.status(400).json({
         success: false,

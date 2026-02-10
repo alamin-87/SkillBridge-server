@@ -36,7 +36,7 @@ function normalizeLanguagesToString(input: any): string | null {
   return null;
 }
 
-/** ✅ parse number safely even if user typed "৳500", "500 ", "500.00" */
+/** parse number safely even if user typed "৳500", "500 ", "500.00" */
 function safeFloat(v: any, fallback = 0) {
   if (v === undefined || v === null || v === "") return fallback;
   const n = typeof v === "number" ? v : Number(String(v).replace(/[^\d.-]/g, ""));
@@ -75,10 +75,8 @@ const parseLanguages = (value: any): string[] => {
             .filter(Boolean);
         }
       } catch {
-        // ignore -> fallback below
       }
     }
-
     // comma-separated fallback
     return s
       .split(",")
@@ -159,7 +157,7 @@ const getTutorById = (id: string) => {
   });
 };
 export const createTutor = async (payload: CreateTutorPayload, userId: string) => {
-  // ✅ IMPORTANT: only put TutorProfile scalar fields here
+  //  only put TutorProfile scalar fields
   const data = {
     userId,
     bio: payload.bio?.trim() || null,
@@ -318,7 +316,7 @@ export const updateTutorProfile = async (userId: string, payload: any) => {
         });
       }
     }
-    //  return updated profile (IMPORTANT: return languages as array)
+    //  return updated profile
     const profile = await tx.tutorProfile.findUnique({
       where: { id: tutorProfile.id },
       include: {

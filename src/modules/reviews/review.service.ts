@@ -26,7 +26,7 @@ const createReview = async (
     throw new Error("You can review only after booking is COMPLETED");
   }
 
-  // create review (bookingId is unique in Review model)
+  // create review
   const review = await prisma.review.create({
     data: {
       bookingId,

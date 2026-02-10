@@ -40,7 +40,7 @@ const createBooking = async (studentId: string, payload: CreateBookingPayload) =
         data: { isBooked: true },
       });
 
-      // override times from slot (recommended to avoid mismatch)
+      // override times from slot 
       return tx.booking.create({
         data: {
           studentId,
@@ -178,7 +178,7 @@ const completeBooking = async (bookingId: string, tutorId: string) => {
 
   if (!booking) throw new Error("Booking not found");
 
-  // ✅ tutor only (must match booking tutor)
+  //tutor only (must match booking tutor)
   if (booking.tutorId !== tutorId) throw new Error("Not allowed");
 
   if (booking.status !== "CONFIRMED") {
