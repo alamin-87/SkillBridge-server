@@ -1,46 +1,42 @@
-enum UserRole {
-  STUDENT
-  TUTOR
-  ADMIN
-}
-
-enum UserStatus {
-  ACTIVE
-  BANNED
-}
-
 model User {
-  id            String    @id
+  id            String  @id
   name          String
   email         String
-  emailVerified Boolean   @default(false)
+  emailVerified Boolean @default(false)
   image         String?
 
-  // ✅ add these
-  role          UserRole  @default(STUDENT)
-  phone String? @unique
+  role   UserRole   @default(STUDENT)
+  phone  String?    @unique
+  status UserStatus @default(ACTIVE)
 
-  status        UserStatus @default(ACTIVE)
+  // 🔥 NEW
+  lastLoginAt DateTime?
+  isDeleted   Boolean   @default(false)
 
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+  submissions       AssignmentSubmission[] @relation("StudentSubmissions")
+  gradedAssignments AssignmentSubmission[] @relation("GradedAssignments")
 
-  sessions      Session[]
-  accounts      Account[]
+  sessions Session[]
+  accounts Account[]
 
-  // ✅ relations for your app tables
-  tutorProfile      TutorProfile?
-  studentBookings   Booking[] @relation("StudentBookings")
-  tutorBookings     Booking[] @relation("TutorBookings")
-  reviewsGiven      Review[]  @relation("StudentReviews")
-  reviewsReceived   Review[]  @relation("TutorReviews")
+  tutorProfile    TutorProfile?
+  admin           Admin?
+  studentBookings Booking[]     @relation("StudentBookings")
+  tutorBookings   Booking[]     @relation("TutorBookings")
+  reviewsGiven    Review[]      @relation("StudentReviews")
+  reviewsReceived Review[]      @relation("TutorReviews")
+
+  notifications Notification[]
+  payments      Payment[]
+  assignments   Assignment[]
 
   @@unique([email])
   @@index([role])
   @@index([status])
   @@map("user")
 }
-
 
 model Session {
   id        String   @id

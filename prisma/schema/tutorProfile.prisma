@@ -1,3 +1,4 @@
+
 model TutorProfile {
   id            String  @id @default(cuid())
   user          User    @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -7,14 +8,16 @@ model TutorProfile {
   hourlyRate    Float   @default(0)
   experienceYrs Int     @default(0)
   location      String?
-  languages     String? // store as CSV or JSON string if you want
+  languages     String?
   profileImage  String?
 
-  // Public listing fields
   avgRating     Float   @default(0)
   totalReviews  Int     @default(0)
 
-  // Relations
+  // 🔥 NEW
+  totalEarnings Float   @default(0)
+  isApproved    Boolean @default(false)
+
   categories    TutorCategory[]
   availability  TutorAvailability[]
   bookings      Booking[]

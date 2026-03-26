@@ -1,38 +1,36 @@
-enum BookingStatus {
-  CONFIRMED
-  COMPLETED
-  CANCELLED
-}
-
 model Booking {
   id String @id @default(cuid())
 
-  // Student (User)
   student   User   @relation("StudentBookings", fields: [studentId], references: [id], onDelete: Cascade)
   studentId String
 
-  // Tutor (User)
   tutor   User   @relation("TutorBookings", fields: [tutorId], references: [id], onDelete: Cascade)
   tutorId String
 
-  // Tutor Profile (for pricing/category context)
   tutorProfile   TutorProfile @relation(fields: [tutorProfileId], references: [id], onDelete: Cascade)
   tutorProfileId String
 
-  // Optional: lock a specific slot
   availability   TutorAvailability? @relation(fields: [availabilityId], references: [id], onDelete: SetNull)
   availabilityId String?
 
   scheduledStart DateTime
   scheduledEnd   DateTime
 
-  price          Float
-  status         BookingStatus @default(CONFIRMED)
+  price Float
 
-  cancelledById  String? // store userId who cancelled (student/tutor/admin)
-  cancelReason   String?
+  // 🔥 UPGRADE
+  status        BookingStatus
+  paymentStatus PaymentStatus @default(UNPAID)
 
-  review         Review?
+  meetingLink String?
+  notes       String?
+
+  cancelledById String?
+  cancelReason  String?
+
+  review      Review?
+  payment     Payment?
+  assignments Assignment[] // Link assignments created during this booking
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

@@ -3,7 +3,6 @@ import cors from "cors";
 import { toNodeHandler } from "better-auth/node";
 import { auth } from "./lib/auth";
 import { NotFound } from "./middleware/NotFound";
-import errorHandler from "./middleware/GlobalErrorHandeler";
 import { tutorsRouter } from "./modules/tutors/tutors.route";
 import { CategoryRoutes } from "./modules/Categories/category.route";
 import { TutorCategoryRoutes } from "./modules/tutors/tutorCategory.route";
@@ -12,6 +11,7 @@ import { BookingRoutes } from "./modules/bookings/booking.route";
 import { ReviewRoutes } from "./modules/reviews/review.route";
 import { UserRoutes } from "./modules/users/user.route";
 import { AdminRoutes } from "./modules/admin/admin.route";
+import { globalErrorHandler } from "./middleware/GlobalErrorHandeler";
 const app = express();
 app.use(express.json());
 const allowedOrigins = [
@@ -56,6 +56,6 @@ app.get("/", (req, res) => {
   res.send("SkillBridge");
 });
 app.use(NotFound);
-app.use(errorHandler);
+app.use(globalErrorHandler);
 
 export default app;

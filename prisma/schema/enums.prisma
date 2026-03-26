@@ -1,0 +1,43 @@
+enum UserRole {
+  STUDENT
+  TUTOR
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  BANNED
+  SUSPENDED
+}
+enum PaymentProvider {
+  STRIPE
+}
+
+enum PaymentTransactionStatus {
+  INITIATED
+  SUCCESS
+  FAILED
+  REFUNDED
+}
+enum NotificationType {
+  BOOKING
+  PAYMENT
+  SYSTEM
+}
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  UNPAID
+  PAID
+  REFUNDED
+}
+enum AssignmentStatus {
+  PENDING
+  SUBMITTED
+  GRADED
+}
