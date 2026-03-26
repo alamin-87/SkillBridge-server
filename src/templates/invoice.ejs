@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Payment Invoice - SkillBridge</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f6f8;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 700px;
+            margin: 20px auto;
+            background-color: #fff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+
+        .header {
+            background: linear-gradient(135deg, #6C63FF 0%, #43C6AC 100%);
+            color: white;
+            padding: 40px 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 32px;
+            margin-bottom: 5px;
+        }
+
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 30px 25px;
+        }
+
+        .greeting {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .info-box, .details-box {
+            background-color: #f9f9f9;
+            padding: 20px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            font-size: 14px;
+        }
+
+        .info-label {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .info-value {
+            color: #555;
+            text-align: right;
+        }
+
+        .section-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #333;
+            border-bottom: 2px solid #6C63FF;
+            padding-bottom: 8px;
+            margin-top: 25px;
+            margin-bottom: 15px;
+        }
+
+        .details-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .amount-box {
+            background: linear-gradient(135deg, #6C63FF 0%, #43C6AC 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 6px;
+            margin: 25px 0;
+            text-align: center;
+        }
+
+        .amount-label {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-bottom: 10px;
+        }
+
+        .amount-value {
+            font-size: 36px;
+            font-weight: bold;
+        }
+
+        .payment-status {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 15px 0;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        .download-section {
+            text-align: center;
+            margin: 30px 0;
+        }
+
+        .download-btn {
+            display: inline-block;
+            background-color: #6C63FF;
+            color: white;
+            padding: 12px 30px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: background-color 0.3s;
+            font-size: 14px;
+        }
+
+        .download-btn:hover {
+            background-color: #574eda;
+        }
+
+        .footer {
+            background-color: #f9f9f9;
+            padding: 20px 15px;
+            text-align: center;
+            font-size: 12px;
+            color: #666;
+            border-top: 1px solid #eee;
+        }
+
+        .divider {
+            height: 1px;
+            background-color: #eee;
+            margin: 25px 0;
+        }
+
+        @media (max-width: 600px) {
+            .details-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .info-row {
+                flex-direction: column;
+            }
+
+            .info-value {
+                text-align: left;
+                margin-top: 5px;
+            }
+
+            .amount-value {
+                font-size: 28px;
+            }
+
+            .header h1 {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>INVOICE</h1>
+            <p>SkillBridge Payment Receipt</p>
+        </div>
+
+        <!-- Content -->
+        <div class="content">
+            <div class="greeting">
+                Hello <%= studentName || 'Student' %>,
+            </div>
+
+            <p style="margin-bottom: 20px; color: #555; font-size: 14px;">
+                Your payment for the selected SkillBridge course has been successfully processed. Below is your payment invoice.
+            </p>
+
+            <!-- Invoice Details -->
+            <div class="info-box">
+                <div class="info-row">
+                    <span class="info-label">Invoice ID:</span>
+                    <span class="info-value"><%= invoiceId || 'N/A' %></span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Transaction ID:</span>
+                    <span class="info-value"><%= transactionId || 'N/A' %></span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Payment Status:</span>
+                    <span class="info-value" style="color: #28a745;">✓ PAID</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Payment Date:</span>
+                    <span class="info-value"><%= paymentDate || 'N/A' %></span>
+                </div>
+            </div>
+
+            <!-- Course & Enrollment Info -->
+            <div class="section-title">Course Details</div>
+            <div class="details-grid">
+                <div class="details-box">
+                    <p><span class="label">Course:</span></p>
+                    <p><strong><%= courseName || 'N/A' %></strong></p>
+                </div>
+                <div class="details-box">
+                    <p><span class="label">Enrollment Date:</span></p>
+                    <p><strong><%= enrollmentDate || 'N/A' %></strong></p>
+                </div>
+            </div>
+
+            <!-- Amount Section -->
+            <div class="section-title">Payment Summary</div>
+            <div class="info-box">
+                <div class="info-row">
+                    <span class="info-label">Course Fee:</span>
+                    <span class="info-value"><strong><%= amount ? amount.toFixed(2) : '0.00' %> USD</strong></span>
+                </div>
+            </div>
+
+            <div class="amount-box">
+                <div class="amount-label">Total Amount Paid</div>
+                <div class="amount-value"><%= amount ? amount.toFixed(2) : '0.00' %> USD</div>
+            </div>
+
+            <div class="payment-status">
+                ✓ Payment Confirmed
+            </div>
+
+            <!-- Download Invoice -->
+            <div class="download-section">
+                <% if (invoiceUrl) { %>
+                    <a href="<%= invoiceUrl %>" class="download-btn">Download Invoice PDF</a>
+                <% } else { %>
+                    <p style="color: #555; font-size: 13px;">Invoice PDF will be available soon.</p>
+                <% } %>
+            </div>
+
+            <div class="divider"></div>
+
+            <!-- Additional Info -->
+            <p style="font-size: 13px; color: #555; margin-bottom: 15px;">
+                <strong>Next Steps:</strong><br>
+                You are enrolled in the course. Please log in to your SkillBridge dashboard to start your learning journey.
+            </p>
+
+            <p style="font-size: 13px; color: #555;">
+                If you have any questions or need assistance, contact our support team at <a href="mailto:support@skillbridge.com">support@skillbridge.com</a>.
+            </p>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p><strong>SkillBridge</strong></p>
+            <p>Empowering Skills, Bridging Careers</p>
+            <p style="margin-top: 10px; font-size: 11px; color: #999;">
+                &copy; 2026 SkillBridge. All rights reserved.
+            </p>
+            <p style="margin-top: 5px;">
+                <a href="https://skillbridge.com">Visit our website</a>
+            </p>
+            <p style="margin-top: 10px; font-size: 11px; color: #999;">
+                This is an automatically generated email. Please do not reply.
+            </p>
+        </div>
+    </div>
+</body>
+</html>

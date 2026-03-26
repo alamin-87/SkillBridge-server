@@ -12,6 +12,7 @@ model User {
   // 🔥 NEW
   lastLoginAt DateTime?
   isDeleted   Boolean   @default(false)
+  deletedAt   DateTime?
 
   createdAt         DateTime               @default(now())
   updatedAt         DateTime               @updatedAt

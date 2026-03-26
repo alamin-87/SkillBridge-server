@@ -12,7 +12,12 @@ import { ReviewRoutes } from "./modules/reviews/review.route";
 import { UserRoutes } from "./modules/users/user.route";
 import { AdminRoutes } from "./modules/admin/admin.route";
 import { globalErrorHandler } from "./middleware/GlobalErrorHandeler";
+import qs from "qs";
+import path from "path";
 const app = express();
+app.set("query parser", (str: string) => qs.parse(str));
+app.set("view engine", "ejs");
+app.set("views", path.resolve(process.cwd(), `src/app/templates`));
 app.use(express.json());
 const allowedOrigins = [
   process.env.APP_URL || "http://localhost:3000",
@@ -44,14 +49,18 @@ app.use(
 
 
 app.all("/api/auth/*splat", toNodeHandler(auth));
-app.use("/api/user", UserRoutes);
-app.use("/api/admin", AdminRoutes);
-app.use("/api/tutor", tutorsRouter);
-app.use("/api/categories", CategoryRoutes);
-app.use("/api/tutorCategories", TutorCategoryRoutes);
-app.use("/api", AvailabilityRoutes);
-app.use("/api/bookings", BookingRoutes);
-app.use("/api/reviews", ReviewRoutes);
+// Enable URL-encoded form data parsing
+app.use(express.urlencoded({ extended: true }));
+
+app.use("/api/v1/user", UserRoutes);
+app.use("/api/v1/admin", AdminRoutes);
+app.use("/api/v1/tutor", tutorsRouter);
+app.use("/api/v1/categories", CategoryRoutes);
+app.use("/api/v1/tutorCategories", TutorCategoryRoutes);
+app.use("/api/v1", AvailabilityRoutes);
+app.use("/api/v1/bookings", BookingRoutes);
+app.use("/api/v1/reviews", ReviewRoutes);
+
 app.get("/", (req, res) => {
   res.send("SkillBridge");
 });

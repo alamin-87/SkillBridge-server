@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Redirecting to Google...</title>
+    <style>
+      body {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        font-family: Arial, sans-serif;
+        background-color: #f7f7f7;
+        color: #333;
+        text-align: center;
+      }
+      .spinner {
+        border: 6px solid #f3f3f3;
+        border-top: 6px solid #4285f4;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        animation: spin 1s linear infinite;
+        margin: 20px auto;
+      }
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+      .error {
+        color: red;
+        margin-top: 20px;
+      }
+      button.retry {
+        margin-top: 10px;
+        padding: 8px 16px;
+        background-color: #4285f4;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      button.retry:hover {
+        background-color: #3367d6;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="content">
+      <p>Redirecting to Google...</p>
+      <div class="spinner"></div>
+    </div>
+
+    <script>
+      const content = document.getElementById("content");
+
+      const redirectToGoogle = async () => {
+        try {
+          const response = await fetch(
+            "<%= betterAuthUrl %>/api/auth/sign-in/social",
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
+              body: JSON.stringify({
+                provider: "google",
+                callbackURL: "<%= callbackURL %>",
+              }),
+            },
+          );
+
+          const data = await response.json();
+
+          if (data.url) {
+            window.location.href = data.url;
+          } else {
+            showError("Error redirecting to Google. Please try again.");
+          }
+        } catch (err) {
+          showError(`Error redirecting to Google: ${err.message}`);
+        }
+      };
+
+      const showError = (message) => {
+        content.innerHTML = `
+          <p class="error">${message}</p>
+          <button class="retry">Retry</button>
+        `;
+        const retryButton = document.querySelector("button.retry");
+        retryButton.addEventListener("click", () => {
+          content.innerHTML =
+            '<p>Redirecting to Google...</p><div class="spinner"></div>';
+          redirectToGoogle();
+        });
+      };
+
+      redirectToGoogle();
+    </script>
+  </body>
+</html>

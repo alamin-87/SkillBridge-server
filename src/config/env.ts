@@ -27,7 +27,7 @@ interface EnvConfig {
   };
   GOOGLE_CLIENT_ID: string;
   GOOGLE_CLIENT_SECRET: string;
-  GOOGLE_CALLBACK_URL: string;
+  // GOOGLE_CALLBACK_URL: string;
   FRONTEND_URL: string;
   CLOUDINARY: {
     CLOUDINARY_CLOUD_NAME: string;
@@ -64,7 +64,7 @@ const envConfig = (): EnvConfig => {
     "EMAIL_SENDER_SMTP_FROM",
     "GOOGLE_CLIENT_ID",
     "GOOGLE_CLIENT_SECRET",
-    "GOOGLE_CALLBACK_URL",
+    // "GOOGLE_CALLBACK_URL",
     "FRONTEND_URL",
     "CLOUDINARY_CLOUD_NAME",
     "CLOUDINARY_API_KEY",
@@ -107,7 +107,7 @@ const envConfig = (): EnvConfig => {
     },
     GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID!,
     GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET!,
-    GOOGLE_CALLBACK_URL: process.env.GOOGLE_CALLBACK_URL!,
+    // GOOGLE_CALLBACK_URL: process.env.GOOGLE_CALLBACK_URL!,
     FRONTEND_URL: process.env.FRONTEND_URL!,
     CLOUDINARY: {
       CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME!,
