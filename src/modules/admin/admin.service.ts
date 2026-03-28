@@ -50,7 +50,7 @@ const updateUser = async (
     throw new AppError(status.NOT_FOUND, "User targeted for update not found");
   }
 
-  return prisma.user.update({
+  const updatedUser = await prisma.user.update({
     where: { id },
     data: payload,
     select: {
@@ -62,6 +62,30 @@ const updateUser = async (
       updatedAt: true,
     },
   });
+
+  if (payload.status) {
+    await prisma.notification.create({
+      data: {
+        userId: id,
+        title: "Account Status Update",
+        message: `Your account status was updated by an administrator to: ${payload.status}`,
+        type: "SYSTEM",
+      },
+    });
+  }
+
+  if (payload.role) {
+    await prisma.notification.create({
+      data: {
+        userId: id,
+        title: "Account Role Upgrade",
+        message: `Your account role was inherently modified by an administrator to: ${payload.role}`,
+        type: "SYSTEM",
+      },
+    });
+  }
+
+  return updatedUser;
 };
 
 const deleteUser = async (id: string) => {
@@ -148,6 +172,70 @@ const deleteCategory = async (id: string) => {
   return prisma.category.delete({ where: { id } });
 };
 
+// ─── Payment Auditing ───────────────────────────────────────────────
+const getAllPayments = async () => {
+  return prisma.payment.findMany({
+    include: {
+      booking: {
+        include: {
+          tutor: { select: { name: true, email: true } },
+          student: { select: { name: true, email: true } },
+        },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+};
+
+// ─── Review Moderation ──────────────────────────────────────────────
+const getAllReviews = async () => {
+  return prisma.review.findMany({
+    include: {
+      tutor: { select: { name: true, email: true } },
+      student: { select: { name: true, email: true } },
+      booking: { select: { scheduledStart: true, scheduledEnd: true } },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+};
+
+const deleteReview = async (id: string) => {
+  const existingReview = await prisma.review.findUnique({ where: { id } });
+  if (!existingReview) {
+    throw new AppError(status.NOT_FOUND, "Review inherently not found");
+  }
+
+  return prisma.$transaction(async (tx) => {
+    // Delete the review
+    const deleted = await tx.review.delete({ where: { id } });
+
+    // Re-calculate the tutor rating natively explicitly avoiding floating metrics
+    const stats = await tx.review.aggregate({
+      where: { tutorId: existingReview.tutorId },
+      _avg: { rating: true },
+      _count: { rating: true },
+    });
+
+    await tx.tutorProfile.update({
+      where: { userId: existingReview.tutorId },
+      data: {
+        avgRating: Number(stats._avg.rating ?? 0),
+        totalReviews: stats._count.rating,
+      },
+    });
+
+    return deleted;
+  });
+};
+
+// ─── Assignment Moderation ───────────────────────────────────────────
+const deleteAssignment = async (id: string) => {
+  const assignment = await prisma.assignment.findUnique({ where: { id } });
+  if (!assignment) throw new AppError(status.NOT_FOUND, "Assignment entirely missing");
+  
+  return prisma.assignment.delete({ where: { id } });
+};
+
 export const AdminService = {
   getAllUsers,
   getUserDetails,
@@ -159,4 +247,8 @@ export const AdminService = {
   createCategory,
   updateCategory,
   deleteCategory,
+  getAllPayments,
+  getAllReviews,
+  deleteReview,
+  deleteAssignment
 };

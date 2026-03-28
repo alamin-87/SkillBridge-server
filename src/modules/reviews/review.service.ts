@@ -77,6 +77,15 @@ const createReview = async (studentId: string, payload: CreateReviewPayload) => 
       },
     });
 
+    await tx.notification.create({
+      data: {
+        userId: booking.tutorId,
+        title: "New Student Review",
+        message: `A student has provided a new review dropping ${rating} stars.`,
+        type: "SYSTEM",
+      },
+    });
+
     return review;
   });
 };

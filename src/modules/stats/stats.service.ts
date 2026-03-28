@@ -122,6 +122,31 @@ const getStudentStats = async (userId: string) => {
     },
   });
 
+  // ── Upcoming bookings ──
+  const upcomingBookings = await prisma.booking.findMany({
+    where: { 
+      studentId: userId, 
+      status: "CONFIRMED", 
+      scheduledStart: { gt: new Date() } 
+    },
+    orderBy: { scheduledStart: "asc" },
+    take: 5,
+    include: {
+      tutor: { select: { id: true, name: true, image: true, email: true } },
+    },
+  });
+
+  // ── Recent Assignments ──
+  const recentAssignments = await prisma.assignmentSubmission.findMany({
+    where: { studentId: userId },
+    orderBy: { createdAt: "desc" },
+    take: 5,
+    include: {
+      assignment: { select: { id: true, title: true } },
+      gradedBy: { select: { id: true, name: true } }
+    }
+  });
+
   return {
     summary: {
       totalBookings,
@@ -138,8 +163,10 @@ const getStudentStats = async (userId: string) => {
       monthlyBookings,
       monthlySpending,
     },
+    upcomingBookings,
     recentBookings,
     recentReviews,
+    recentAssignments,
   };
 };
 
@@ -312,6 +339,34 @@ const getTutorStats = async (userId: string) => {
       where: { gradedById: userId },
     });
 
+  // ── Upcoming bookings ──
+  const upcomingBookings = await prisma.booking.findMany({
+    where: { 
+      tutorId: userId, 
+      status: "CONFIRMED", 
+      scheduledStart: { gt: new Date() } 
+    },
+    orderBy: { scheduledStart: "asc" },
+    take: 5,
+    include: {
+      student: { select: { id: true, name: true, image: true, email: true } },
+    },
+  });
+
+  // ── Pending Assignments to grade ──
+  const pendingAssignments = await prisma.assignmentSubmission.findMany({
+    where: { 
+      assignment: { createdById: userId }, 
+      status: "SUBMITTED" 
+    },
+    orderBy: { createdAt: "asc" },
+    take: 5,
+    include: {
+      assignment: { select: { id: true, title: true } },
+      student: { select: { id: true, name: true, image: true, email: true } }
+    }
+  });
+
   return {
     summary: {
       totalBookings,
@@ -330,8 +385,10 @@ const getTutorStats = async (userId: string) => {
       monthlyBookings,
       monthlyNewStudents,
     },
+    upcomingBookings,
     recentBookings,
     recentReviews,
+    pendingAssignments,
   };
 };
 
@@ -557,6 +614,89 @@ const getAdminStats = async () => {
     },
   });
 
+  const recentUsers = await prisma.user.findMany({
+    orderBy: { createdAt: "desc" },
+    take: 5,
+    select: { id: true, name: true, email: true, role: true, status: true, image: true, createdAt: true },
+  });
+
+  const recentReviews = await prisma.review.findMany({
+    orderBy: { createdAt: "desc" },
+    take: 5,
+    include: {
+      student: { select: { id: true, name: true, image: true } },
+      tutor: { select: { id: true, name: true, image: true } },
+    },
+  });
+
+  // ── All Tutors Stats for Admin ──
+  const tutors = await prisma.user.findMany({
+    where: { role: "TUTOR", isDeleted: false },
+    include: {
+      tutorProfile: { include: { availability: true } },
+      tutorBookings: { include: { payment: true } },
+    }
+  });
+
+  const allTutorsStats = tutors.map(tutor => {
+    const totalBookings = tutor.tutorBookings.length;
+    const completedBookings = tutor.tutorBookings.filter(b => b.status === "COMPLETED").length;
+    const earnings = tutor.tutorProfile?.totalEarnings || 0;
+    
+    // Calculate total successful payments correctly
+    const totalPaymentsReceived = tutor.tutorBookings.reduce((sum, booking) => {
+       if (booking.payment && booking.payment.status === "SUCCESS") {
+         return sum + booking.payment.amount;
+       }
+       return sum;
+    }, 0);
+
+    return {
+      id: tutor.id,
+      name: tutor.name,
+      email: tutor.email,
+      image: tutor.image,
+      status: tutor.status,
+      avgRating: tutor.tutorProfile?.avgRating || 0,
+      hourlyRate: tutor.tutorProfile?.hourlyRate || 0,
+      availabilityCount: tutor.tutorProfile?.availability?.length || 0,
+      totalBookings,
+      completedBookings,
+      earnings: earnings > 0 ? earnings : totalPaymentsReceived
+    };
+  });
+
+  // ── All Students Stats for Admin ──
+  const students = await prisma.user.findMany({
+    where: { role: "STUDENT", isDeleted: false },
+    include: {
+      studentBookings: { include: { payment: true } }
+    }
+  });
+
+  const allStudentsStats = students.map(student => {
+    const totalBookings = student.studentBookings.length;
+    const completedBookings = student.studentBookings.filter(b => b.status === "COMPLETED").length;
+    
+    const spendMoney = student.studentBookings.reduce((sum, booking) => {
+       if (booking.payment && booking.payment.status === "SUCCESS") {
+         return sum + booking.payment.amount;
+       }
+       return sum;
+    }, 0);
+
+    return {
+      id: student.id,
+      name: student.name,
+      email: student.email,
+      image: student.image,
+      status: student.status,
+      totalBookings,
+      completedBookings,
+      spendMoney
+    };
+  });
+
   return {
     summary: {
       totalUsers,
@@ -609,6 +749,10 @@ const getAdminStats = async () => {
     recentBookings,
     recentPayments,
     recentTutorRequests,
+    recentUsers,
+    recentReviews,
+    allTutorsStats,
+    allStudentsStats,
   };
 };
 

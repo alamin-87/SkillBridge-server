@@ -310,6 +310,15 @@ const resetPassword = async (
   await prisma.session.deleteMany({
     where: { userId: user.id },
   });
+
+  await prisma.notification.create({
+    data: {
+      userId: user.id,
+      title: "Password Reset Successful",
+      message: "Your password has been securely reset. If you did not authorize this, please contact support immediately.",
+      type: "SYSTEM",
+    },
+  });
 };
 
 // GOOGLE LOGIN SUCCESS

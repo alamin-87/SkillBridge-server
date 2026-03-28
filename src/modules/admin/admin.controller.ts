@@ -173,4 +173,44 @@ export const AdminController = {
       data,
     });
   }),
+
+  getAllPayments: catchAsync(async (_req: Request, res: Response) => {
+    const data = await AdminService.getAllPayments();
+    sendResponse(res, {
+      httpStatusCode: status.OK,
+      success: true,
+      message: "Comprehensive payments log retrieved",
+      data,
+    });
+  }),
+
+  getAllReviews: catchAsync(async (_req: Request, res: Response) => {
+    const data = await AdminService.getAllReviews();
+    sendResponse(res, {
+      httpStatusCode: status.OK,
+      success: true,
+      message: "Comprehensive reviews retrieved securely",
+      data,
+    });
+  }),
+
+  deleteReview: catchAsync(async (req: Request, res: Response) => {
+    const data = await AdminService.deleteReview(req.params.id as string);
+    sendResponse(res, {
+      httpStatusCode: status.OK,
+      success: true,
+      message: "Inappropriate review deleted successfully resolving global ranks",
+      data,
+    });
+  }),
+
+  deleteAssignment: catchAsync(async (req: Request, res: Response) => {
+    const data = await AdminService.deleteAssignment(req.params.id as string);
+    sendResponse(res, {
+      httpStatusCode: status.OK,
+      success: true,
+      message: "Assignment strictly terminated from database",
+      data,
+    });
+  }),
 };

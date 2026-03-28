@@ -62,7 +62,7 @@ const createBooking = async (studentId: string, payload: CreateBookingPayload) =
       const slotDurationHours = (slot.endTime.getTime() - slot.startTime.getTime()) / (1000 * 60 * 60);
       const slotPackagePrice = tutorProfile.hourlyRate * slotDurationHours * 30; 
 
-      return tx.booking.create({
+      const newBooking = await tx.booking.create({
         data: {
           studentId,
           tutorId,
@@ -75,10 +75,21 @@ const createBooking = async (studentId: string, payload: CreateBookingPayload) =
           notes: thirtyDaysNotes
         },
       });
+
+      await tx.notification.create({
+        data: {
+          userId: tutorId,
+          title: "New Booking Received",
+          message: `A student explicitly established a 30-day package structurally tying a fixed availability slot.`,
+          type: "BOOKING",
+        },
+      });
+
+      return newBooking;
     }
 
     // Processing manual slot creation (no pre-generated availability picked)
-    return tx.booking.create({
+    const manualBooking = await tx.booking.create({
       data: {
         studentId,
         tutorId,
@@ -90,6 +101,17 @@ const createBooking = async (studentId: string, payload: CreateBookingPayload) =
         notes: thirtyDaysNotes
       },
     });
+
+    await tx.notification.create({
+      data: {
+        userId: tutorId,
+        title: "New Booking Received",
+        message: `A student manually established a 30-day package structure outside generic slots.`,
+        type: "BOOKING",
+      },
+    });
+
+    return manualBooking;
   });
 };
 
@@ -184,7 +206,7 @@ const cancelBooking = async (
     }
 
     // Process ultimate cancellation status application
-    return tx.booking.update({
+    const cancelledBooking = await tx.booking.update({
       where: { id: bookingId },
       data: {
         status: "CANCELLED",
@@ -192,6 +214,19 @@ const cancelBooking = async (
         cancelReason: reason ?? null,
       },
     });
+
+    const targetUserId = userId === booking.studentId ? booking.tutorId : booking.studentId;
+    
+    await tx.notification.create({
+      data: {
+        userId: targetUserId,
+        title: "Booking Cancelled",
+        message: `An upcoming reserved booking block was cancelled securely.`,
+        type: "BOOKING"
+      }
+    });
+
+    return cancelledBooking;
   });
 };
 
@@ -210,10 +245,21 @@ const completeBooking = async (bookingId: string, tutorId: string) => {
     throw new AppError(status.BAD_REQUEST, "Booking item requires CONFIRMED status before completion trigger applicable");
   }
 
-  return prisma.booking.update({
+  const completed = await prisma.booking.update({
     where: { id: bookingId },
     data: { status: "COMPLETED" },
   });
+
+  await prisma.notification.create({
+    data: {
+      userId: booking.studentId,
+      title: "Booking Finalized",
+      message: "Your session block has fully concluded! Please leave a review for this tutor.",
+      type: "BOOKING"
+    }
+  });
+
+  return completed;
 };
 
 export const BookingService = {

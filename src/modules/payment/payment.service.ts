@@ -151,6 +151,16 @@ const handleStripeWebhook = async (rawBody: Buffer | string, signature: string) 
             },
           },
         });
+
+        // Notify Student of Payment Completion mapped implicitly
+        await tx.notification.create({
+          data: {
+            userId: payment.userId,
+            title: "Payment Processed",
+            message: `Your payment was fully settled structurally matching a secured transactional record.`,
+            type: "PAYMENT",
+          },
+        });
       });
 
       break;
@@ -159,12 +169,24 @@ const handleStripeWebhook = async (rawBody: Buffer | string, signature: string) 
     case "payment_intent.payment_failed": {
       const failedIntent = event.data.object as Stripe.PaymentIntent;
       const paymentId = failedIntent.metadata.internalPaymentId;
+      const studentId = failedIntent.metadata.studentId;
 
       if (paymentId) {
         await prisma.payment.update({
           where: { id: paymentId },
           data: { status: "FAILED" },
         });
+
+        if (studentId) {
+          await prisma.notification.create({
+            data: {
+              userId: studentId,
+              title: "Payment Failed",
+              message: "Your recent payment attempt failed to process. Please verify your card details.",
+              type: "PAYMENT",
+            },
+          });
+        }
       }
       break;
     }

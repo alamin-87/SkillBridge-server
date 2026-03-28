@@ -201,6 +201,15 @@ const approveTutorRequest = async (requestId: string) => {
       data: { status: "APPROVED" },
     });
 
+    await tx.notification.create({
+      data: {
+        userId: tutorRequest.userId,
+        title: "Tutor Application Approved",
+        message: "Congratulations! You have been officially approved as a Tutor on SkillBridge.",
+        type: "SYSTEM",
+      },
+    });
+
     return tutorProfile;
   });
 
@@ -250,6 +259,15 @@ const rejectTutorRequest = async (
     data: {
       status: "REJECTED",
       rejectionReason,
+    },
+  });
+
+  await prisma.notification.create({
+    data: {
+      userId: tutorRequest.userId,
+      title: "Tutor Application Rejected",
+      message: `Your tutor application was declined. Reason: ${rejectionReason}`,
+      type: "SYSTEM",
     },
   });
 
