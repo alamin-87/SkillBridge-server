@@ -1,12 +1,12 @@
 model Assignment {
-  id        String   @id @default(cuid())
-  title     String
+  id          String           @id @default(cuid())
+  title       String
   description String?
-  status    AssignmentStatus @default(PENDING)
+  status      AssignmentStatus @default(PENDING)
 
   // Student who created/submitted the assignment
   submissions AssignmentSubmission[]
-  createdBy   User     @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  createdBy   User                   @relation(fields: [createdById], references: [id], onDelete: Cascade)
   createdById String
 
   // Optional linked booking (if assignment is tied to a tutoring session)

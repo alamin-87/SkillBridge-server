@@ -1,11 +1,11 @@
 import type { NextFunction, Request, Response } from "express";
 import type { ZodTypeAny } from "zod";
-import { ZodError } from "zod";
 import AppError from "../errorHelpers/AppError";
 
 /**
  * Middleware to validate request body with Zod schema
- * @param zodSchema - Zod schema to validate against
+ * Schemas should be shaped as: z.object({ body: z.object({...}) })
+ * Optionally supports params and query too.
  */
 export const validateRequest = (zodSchema: ZodTypeAny): any => {
   return (req: Request, res: Response, next: NextFunction) => {
@@ -19,18 +19,31 @@ export const validateRequest = (zodSchema: ZodTypeAny): any => {
         }
       }
 
-      const parsedResult = zodSchema.safeParse(req.body);
+      // Wrap req parts so schema shape { body, params, query } works correctly
+      const parsedResult = zodSchema.safeParse({
+        body: req.body,
+        params: req.params,
+        query: req.query,
+      });
 
       if (!parsedResult.success) {
-        // Extract readable Zod errors
         const errorMessages = parsedResult.error.issues.map(
           (e: any) => `${e.path.join(".")}: ${e.message}`
         );
         throw new AppError(400, "Validation Error", errorMessages);
       }
 
-      // Overwrite request body with sanitized and validated data
-      req.body = parsedResult.data;
+      // Overwrite request fields with sanitized and validated data
+      const data = parsedResult.data as Record<string, any>;
+      req.body = data.body;
+
+      if (data.params) {
+        req.params = data.params;
+      }
+
+      if (data.query) {
+        req.query = data.query;
+      }
 
       next();
     } catch (error) {

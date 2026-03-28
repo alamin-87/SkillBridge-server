@@ -20,6 +20,8 @@ export interface IQueryParams {
 export interface IQueryConfig {
   searchableFields?: string[];
   filterableFields?: string[];
+  /** When false, skip default `isDeleted: false` (models without soft delete). Default true. */
+  applySoftDeleteDefault?: boolean;
 }
 
 // 🔹 Response Meta
@@ -90,6 +92,7 @@ export interface PrismaCountArgs {
 // 🔹 Prisma Model Delegate (Generic Model)
 export interface PrismaModelDelegate {
   findMany(args?: any): Promise<any[]>;
+  findFirst?(args?: any): Promise<any>;
   count(args?: any): Promise<number>;
   aggregate?(args?: any): Promise<any>;
 }

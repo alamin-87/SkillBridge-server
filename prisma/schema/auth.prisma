@@ -8,6 +8,7 @@ model User {
   role   UserRole   @default(STUDENT)
   phone  String?    @unique
   status UserStatus @default(ACTIVE)
+  // tutorStatus TutorStatus @default(NONE)
 
   // 🔥 NEW
   lastLoginAt DateTime?
@@ -23,11 +24,12 @@ model User {
   accounts Account[]
 
   tutorProfile    TutorProfile?
+  tutorRequests   TutorRequest[] @relation("tutorRequests")
   admin           Admin?
-  studentBookings Booking[]     @relation("StudentBookings")
-  tutorBookings   Booking[]     @relation("TutorBookings")
-  reviewsGiven    Review[]      @relation("StudentReviews")
-  reviewsReceived Review[]      @relation("TutorReviews")
+  studentBookings Booking[]      @relation("StudentBookings")
+  tutorBookings   Booking[]      @relation("TutorBookings")
+  reviewsGiven    Review[]       @relation("StudentReviews")
+  reviewsReceived Review[]       @relation("TutorReviews")
 
   notifications Notification[]
   payments      Payment[]

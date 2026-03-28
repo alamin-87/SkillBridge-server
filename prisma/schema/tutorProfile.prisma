@@ -1,26 +1,25 @@
-
 model TutorProfile {
-  id            String  @id @default(cuid())
-  user          User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId        String  @unique
+  id     String @id @default(cuid())
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String @unique
 
-  bio           String?
+  bio           String
   hourlyRate    Float   @default(0)
   experienceYrs Int     @default(0)
   location      String?
   languages     String?
   profileImage  String?
 
-  avgRating     Float   @default(0)
-  totalReviews  Int     @default(0)
+  avgRating    Float @default(0)
+  totalReviews Int   @default(0)
 
   // 🔥 NEW
   totalEarnings Float   @default(0)
   isApproved    Boolean @default(false)
 
-  categories    TutorCategory[]
-  availability  TutorAvailability[]
-  bookings      Booking[]
+  categories   TutorCategory[]
+  availability TutorAvailability[]
+  bookings     Booking[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -30,31 +29,52 @@ model TutorProfile {
 }
 
 model TutorAvailability {
-  id             String        @id @default(cuid())
-  tutorProfile   TutorProfile  @relation(fields: [tutorProfileId], references: [id], onDelete: Cascade)
+  id             String       @id @default(cuid())
+  tutorProfile   TutorProfile @relation(fields: [tutorProfileId], references: [id], onDelete: Cascade)
   tutorProfileId String
 
-  startTime      DateTime
-  endTime        DateTime
-  isBooked       Boolean       @default(false)
+  startTime DateTime
+  endTime   DateTime
+  isBooked  Boolean  @default(false)
 
   // ✅ Opposite relation (add this)
-  bookings       Booking[]     // one slot can be linked to many bookings (or 1, depending on your rules)
+  bookings Booking[] // one slot can be linked to many bookings (or 1, depending on your rules)
 
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([tutorProfileId])
   @@index([startTime, endTime])
 }
+
+model TutorRequest {
+  id     String @id @default(cuid())
+  user   User   @relation("tutorRequests", fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  bio           String
+  hourlyRate    Float
+  experienceYrs Int
+  location      String?
+  languages     String?
+
+  status          String  @default("PENDING") // PENDING, APPROVED, REJECTED
+  rejectionReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}
+
 model TutorCategory {
-  id            String       @id @default(cuid())
-  tutorProfile  TutorProfile @relation(fields: [tutorProfileId], references: [id], onDelete: Cascade)
+  id             String       @id @default(cuid())
+  tutorProfile   TutorProfile @relation(fields: [tutorProfileId], references: [id], onDelete: Cascade)
   tutorProfileId String
-  category      Category     @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  categoryId    String
+  category       Category     @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  categoryId     String
 
   @@unique([tutorProfileId, categoryId])
   @@index([categoryId])
 }
-

@@ -14,11 +14,16 @@ import { AdminRoutes } from "./modules/admin/admin.route";
 import { globalErrorHandler } from "./middleware/GlobalErrorHandeler";
 import qs from "qs";
 import path from "path";
+import { IndexRoute } from "./routers";
 const app = express();
 app.set("query parser", (str: string) => qs.parse(str));
 app.set("view engine", "ejs");
 app.set("views", path.resolve(process.cwd(), `src/app/templates`));
+
+// Stripe Webhook bypasses standard global JSON parsing preserving signature buffers
+app.use("/api/v1/payments/webhook", express.raw({ type: "application/json" }));
 app.use(express.json());
+
 const allowedOrigins = [
   process.env.APP_URL || "http://localhost:3000",
   process.env.PROD_APP_URL,
@@ -47,19 +52,22 @@ app.use(
   }),
 );
 
+// Enable Better Auth routes for OAuth handling (use regex pattern)
+app.all(/^\/api\/auth\/.*$/, toNodeHandler(auth));
 
-app.all("/api/auth/*splat", toNodeHandler(auth));
 // Enable URL-encoded form data parsing
 app.use(express.urlencoded({ extended: true }));
 
-app.use("/api/v1/user", UserRoutes);
-app.use("/api/v1/admin", AdminRoutes);
-app.use("/api/v1/tutor", tutorsRouter);
-app.use("/api/v1/categories", CategoryRoutes);
-app.use("/api/v1/tutorCategories", TutorCategoryRoutes);
-app.use("/api/v1", AvailabilityRoutes);
-app.use("/api/v1/bookings", BookingRoutes);
-app.use("/api/v1/reviews", ReviewRoutes);
+// app.use("/api/v1/user", UserRoutes);
+// app.use("/api/v1/admin", AdminRoutes);
+// app.use("/api/v1/tutor", tutorsRouter);
+// app.use("/api/v1/categories", CategoryRoutes);
+// app.use("/api/v1/tutorCategories", TutorCategoryRoutes);
+// app.use("/api/v1", AvailabilityRoutes);
+// app.use("/api/v1/bookings", BookingRoutes);
+// app.use("/api/v1/reviews", ReviewRoutes);
+
+app.use("/api/v1", IndexRoute);
 
 app.get("/", (req, res) => {
   res.send("SkillBridge");

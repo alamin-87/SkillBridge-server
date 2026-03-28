@@ -1,4 +1,6 @@
 import { prisma } from "../../lib/prisma";
+import AppError from "../../errorHelpers/AppError";
+import status from "http-status";
 
 type CreateReviewPayload = {
   bookingId: string;
@@ -6,54 +8,79 @@ type CreateReviewPayload = {
   comment?: string;
 };
 
-const createReview = async (
-  studentId: string,
-  payload: CreateReviewPayload,
-) => {
+const createReview = async (studentId: string, payload: CreateReviewPayload) => {
   const { bookingId, rating, comment } = payload;
 
   // booking must exist
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
   });
-  if (!booking) throw new Error("Booking not found");
+  if (!booking) {
+    throw new AppError(status.NOT_FOUND, "Booking not found");
+  }
 
   // only booking student can review
-  if (booking.studentId !== studentId) throw new Error("Not allowed");
+  if (booking.studentId !== studentId) {
+    throw new AppError(
+      status.FORBIDDEN,
+      "You are not authorized to review this booking"
+    );
+  }
 
   // only after completed
   if (booking.status !== "COMPLETED") {
-    throw new Error("You can review only after booking is COMPLETED");
+    throw new AppError(
+      status.BAD_REQUEST,
+      "You can review only after the consultation booking is COMPLETED"
+    );
   }
 
-  // create review
-  const review = await prisma.review.create({
-    data: {
-      bookingId,
-      studentId,
-      tutorId: booking.tutorId,
-      rating,
-      comment: comment ?? null,
-    },
+  // check if review already exists
+  const existingReview = await prisma.review.findUnique({
+    where: { bookingId },
   });
+  if (existingReview) {
+    throw new AppError(
+      status.BAD_REQUEST,
+      "Review already submitted for this booking"
+    );
+  }
 
-  // update tutorProfile rating summary
-  const stats = await prisma.review.aggregate({
-    where: { tutorId: booking.tutorId },
-    _avg: { rating: true },
-    _count: { rating: true },
+  // create review and update tutor profile in a transaction
+  return await prisma.$transaction(async (tx) => {
+    // create review
+    const review = await tx.review.create({
+      data: {
+        bookingId,
+        studentId,
+        tutorId: booking.tutorId,
+        rating,
+        comment: comment ?? null,
+      },
+      include: {
+        tutor: { select: { id: true, name: true, image: true } },
+      },
+    });
+
+    // update tutorProfile rating summary
+    const stats = await tx.review.aggregate({
+      where: { tutorId: booking.tutorId },
+      _avg: { rating: true },
+      _count: { rating: true },
+    });
+
+    await tx.tutorProfile.update({
+      where: { userId: booking.tutorId },
+      data: {
+        avgRating: Number(stats._avg.rating ?? 0),
+        totalReviews: stats._count.rating,
+      },
+    });
+
+    return review;
   });
-
-  await prisma.tutorProfile.update({
-    where: { userId: booking.tutorId },
-    data: {
-      avgRating: Number(stats._avg.rating ?? 0),
-      totalReviews: stats._count.rating,
-    },
-  });
-
-  return review;
 };
+
 const getTutorReviews = async (tutorId: string) => {
   return prisma.review.findMany({
     where: { tutorId },

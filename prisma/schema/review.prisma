@@ -7,11 +7,11 @@ model Review {
   student   User   @relation("StudentReviews", fields: [studentId], references: [id], onDelete: Cascade)
   studentId String
 
-  tutor     User   @relation("TutorReviews", fields: [tutorId], references: [id], onDelete: Cascade)
-  tutorId   String
+  tutor   User   @relation("TutorReviews", fields: [tutorId], references: [id], onDelete: Cascade)
+  tutorId String
 
-  rating   Int
-  comment  String?
+  rating  Int
+  comment String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

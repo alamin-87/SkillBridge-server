@@ -1,22 +1,22 @@
 model AssignmentSubmission {
-  id          String   @id @default(cuid())
-  assignment  Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  id           String     @id @default(cuid())
+  assignment   Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
   assignmentId String
 
-  student     User       @relation("StudentSubmissions", fields: [studentId], references: [id], onDelete: Cascade)
-  studentId   String
+  student   User   @relation("StudentSubmissions", fields: [studentId], references: [id], onDelete: Cascade)
+  studentId String
 
-  files       Json       // Array of {url, publicId, type}
+  files Json // Array of {url, publicId, type}
 
-  status      AssignmentStatus @default(PENDING)
-  grade       Float?
-  gradedBy    User?      @relation("GradedAssignments", fields: [gradedById], references: [id])
-  gradedById  String?
+  status     AssignmentStatus @default(PENDING)
+  grade      Float?
+  gradedBy   User?            @relation("GradedAssignments", fields: [gradedById], references: [id])
+  gradedById String?
 
-  feedback    String?
+  feedback String?
 
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([studentId])
   @@index([assignmentId])

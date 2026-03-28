@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f9f9f9;
+            border-radius: 8px;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 8px 8px 0 0;
+            text-align: center;
+        }
+        .content {
+            background: white;
+            padding: 30px;
+            border-radius: 0 0 8px 8px;
+        }
+        .profile-section {
+            background-color: #f5f5f5;
+            padding: 20px;
+            border-radius: 6px;
+            margin: 20px 0;
+        }
+        .profile-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .profile-item:last-child {
+            border-bottom: none;
+        }
+        .label {
+            font-weight: 600;
+            color: #667eea;
+        }
+        .value {
+            color: #333;
+        }
+        .button {
+            display: inline-block;
+            padding: 12px 30px;
+            background-color: #667eea;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .footer {
+            margin-top: 30px;
+            text-align: center;
+            color: #666;
+            font-size: 12px;
+        }
+        h2 {
+            color: #667eea;
+            margin-top: 0;
+        }
+        h3 {
+            color: #667eea;
+            margin-top: 20px;
+        }
+        ul {
+            list-style: none;
+            padding: 0;
+        }
+        li {
+            padding: 8px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎉 Welcome to SkillBridge!</h1>
+            <p>Your tutor profile has been approved</p>
+        </div>
+        
+        <div class="content">
+            <h2>Hello <%= userName %>,</h2>
+            
+            <p>Congratulations! Your tutor profile has been successfully approved and is now active on SkillBridge.</p>
+            
+            <h3>Your Tutor Profile Details:</h3>
+            <div class="profile-section">
+                <div class="profile-item">
+                    <span class="label">Email:</span>
+                    <span class="value"><%= userEmail %></span>
+                </div>
+                <div class="profile-item">
+                    <span class="label">Bio:</span>
+                    <span class="value"><%= bio %></span>
+                </div>
+                <div class="profile-item">
+                    <span class="label">Hourly Rate:</span>
+                    <span class="value">$<%= hourlyRate %>/hour</span>
+                </div>
+                <div class="profile-item">
+                    <span class="label">Experience:</span>
+                    <span class="value"><%= experienceYrs %> years</span>
+                </div>
+                <div class="profile-item">
+                    <span class="label">Location:</span>
+                    <span class="value"><%= location || 'Not specified' %></span>
+                </div>
+                <div class="profile-item">
+                    <span class="label">Languages:</span>
+                    <span class="value"><%= languages || 'Not specified' %></span>
+                </div>
+            </div>
+
+            <h3>🚀 Next Steps:</h3>
+            <ol>
+                <li><strong>Complete Your Categories:</strong> Add the subjects you're specialized in teaching</li>
+                <li><strong>Set Your Availability:</strong> Define your working hours and available time slots</li>
+                <li><strong>Prepare for Bookings:</strong> Start accepting student bookings and earn money</li>
+            </ol>
+
+            <h3>📌 Important Information:</h3>
+            <ul>
+                <li>Your profile is now visible to students on SkillBridge</li>
+                <li>You will receive notifications when students request bookings</li>
+                <li>Payment processing begins once students book your sessions</li>
+                <li>Maintain a high rating to attract more students</li>
+            </ul>
+
+            <p style="text-align: center;">
+                <a href="<%= dashboardUrl %>" class="button">Go to Your Tutor Dashboard</a>
+            </p>
+
+            <h3>Need Help?</h3>
+            <p>If you have any questions or need assistance, please contact our support team at <strong>support@skillbridge.com</strong> or reply to this email.</p>
+
+            <p style="margin-top: 30px;">Happy teaching!<br/><strong>Team SkillBridge</strong></p>
+
+            <div class="footer">
+                <p>© 2026 SkillBridge. All rights reserved.<br/>
+                This is an automated message, please do not reply directly.</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,34 +1,52 @@
-import type { Request, Response } from "express";
+import catchAsync from "../../shared/catchAsync";
+import { sendResponse } from "../../shared/sendResponse";
+import status from "http-status";
 import { UserService } from "./user.service";
 
+// GET BY ID
+const getById = catchAsync(async (req: any, res) => {
+  const result = await UserService.getById(req.params.id);
+
+  sendResponse(res, {
+    httpStatusCode: status.OK,
+    success: true,
+    message: "User retrieved successfully",
+    data: result,
+  });
+});
+
+// UPDATE
+const updateUser = catchAsync(async (req: any, res) => {
+  const result = await UserService.updateUser(
+    req.user.userId,
+    req.body,
+    req.files?.profilePhoto?.[0] // 👈 file comes from multer .fields()
+  );
+
+  sendResponse(res, {
+    httpStatusCode: status.OK,
+    success: true,
+    message: "User updated successfully",
+    data: result,
+  });
+});
+
+// DELETE
+const deleteUser = catchAsync(async (req: any, res) => {
+  const result = await UserService.deleteUser(
+    req.user.userId
+  );
+
+  sendResponse(res, {
+    httpStatusCode: status.OK,
+    success: true,
+    message: "User deleted successfully",
+    data: result,
+  });
+});
+
 export const UserController = {
-  get: async (req: Request, res: Response) => {
-    const data = await UserService.getUser(req.user!.id);
-    res.json({ success: true, data });
-  },
-  getById: async (req: Request, res: Response) => {
-    const { id } = req.params;
-
-    if (typeof id !== "string") {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid user id",
-      });
-    }
-
-    const data = await UserService.getUserById(id);
-
-    if (!data) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found",
-      });
-    }
-
-    res.json({ success: true, data });
-  },
-  update: async (req: Request, res: Response) => {
-    const data = await UserService.updateUser(req.user!.id, req.body);
-    res.json({ success: true, message: "User updated", data });
-  },
+  getById,
+  updateUser,
+  deleteUser,
 };

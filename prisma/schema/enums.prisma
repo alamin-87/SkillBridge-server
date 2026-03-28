@@ -9,6 +9,14 @@ enum UserStatus {
   BANNED
   SUSPENDED
 }
+
+enum TutorStatus {
+  NONE
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 enum PaymentProvider {
   STRIPE
 }
@@ -19,11 +27,13 @@ enum PaymentTransactionStatus {
   FAILED
   REFUNDED
 }
+
 enum NotificationType {
   BOOKING
   PAYMENT
   SYSTEM
 }
+
 enum BookingStatus {
   PENDING
   CONFIRMED
@@ -36,6 +46,7 @@ enum PaymentStatus {
   PAID
   REFUNDED
 }
+
 enum AssignmentStatus {
   PENDING
   SUBMITTED

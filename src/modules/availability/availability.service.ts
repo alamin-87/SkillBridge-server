@@ -1,20 +1,39 @@
 import { prisma } from "../../lib/prisma";
+import AppError from "../../errorHelpers/AppError";
+import status from "http-status";
 
 type SlotInput = {
   startTime: string;
   endTime: string;
 };
 
+// Helper function to calculate and append 30-day price information
+const augmentSlotWith30DayPricing = (slot: any, hourlyRate: number) => {
+  const durationHours =
+    (slot.endTime.getTime() - slot.startTime.getTime()) / (1000 * 60 * 60);
+  const thirtyDaysPrice = hourlyRate * durationHours * 30;
+
+  return {
+    ...slot,
+    durationHours,
+    thirtyDaysPrice,
+    packageType: "30-Day Contract",
+    notes: `Available for a fixed daily time from ${slot.startTime.toLocaleTimeString()} to ${slot.endTime.toLocaleTimeString()} matching exactly 30 days total calculated.`,
+  };
+};
+
 const createAvailability = async (
   tutorProfileId: string,
-  slots: SlotInput[],
+  slots: SlotInput[]
 ) => {
   const profile = await prisma.tutorProfile.findUnique({
     where: { id: tutorProfileId },
-    select: { id: true },
+    select: { id: true, hourlyRate: true },
   });
 
-  if (!profile) throw new Error("Tutor profile not found");
+  if (!profile) {
+    throw new AppError(status.NOT_FOUND, "Tutor profile not found");
+  }
 
   const data = slots.map((s) => ({
     tutorProfileId,
@@ -22,20 +41,40 @@ const createAvailability = async (
     endTime: new Date(s.endTime),
   }));
 
+  // Atomically recreate exact requested slots
   await prisma.tutorAvailability.createMany({ data });
 
-  return prisma.tutorAvailability.findMany({
+  const createdSlots = await prisma.tutorAvailability.findMany({
     where: { tutorProfileId },
     orderBy: { startTime: "asc" },
   });
+
+  // Return mapped 30-day package indicators inherently matching new platform behavior guidelines
+  return createdSlots.map((slot) =>
+    augmentSlotWith30DayPricing(slot, profile.hourlyRate)
+  );
 };
 
 const getAllAvailability = async (tutorProfileId: string) => {
-  return prisma.tutorAvailability.findMany({
+  const profile = await prisma.tutorProfile.findUnique({
+    where: { id: tutorProfileId },
+    select: { id: true, hourlyRate: true },
+  });
+
+  if (!profile) {
+    throw new AppError(status.NOT_FOUND, "Tutor profile not found");
+  }
+
+  const slots = await prisma.tutorAvailability.findMany({
     where: { tutorProfileId },
     orderBy: { startTime: "asc" },
   });
+
+  return slots.map((slot) =>
+    augmentSlotWith30DayPricing(slot, profile.hourlyRate)
+  );
 };
+
 const updateAvailability = async (
   availabilityId: string,
   startTime: Date,
@@ -43,22 +82,31 @@ const updateAvailability = async (
 ) => {
   const slot = await prisma.tutorAvailability.findUnique({
     where: { id: availabilityId },
+    include: {
+      tutorProfile: { select: { hourlyRate: true } },
+    },
   });
 
   if (!slot) {
-    throw new Error("Availability not found");
+    throw new AppError(status.NOT_FOUND, "Availability not found");
   }
+  
   if (slot.isBooked) {
-    throw new Error("Booked availability cannot be updated");
+    throw new AppError(
+      status.CONFLICT,
+      "Already booked availability slots cannot be updated"
+    );
   }
 
-  return prisma.tutorAvailability.update({
+  const updatedSlot = await prisma.tutorAvailability.update({
     where: { id: availabilityId },
     data: {
       startTime,
       endTime,
     },
   });
+
+  return augmentSlotWith30DayPricing(updatedSlot, slot.tutorProfile.hourlyRate);
 };
 
 const deleteAvailability = async (availabilityId: string) => {
@@ -66,8 +114,14 @@ const deleteAvailability = async (availabilityId: string) => {
     where: { id: availabilityId },
   });
 
-  if (!slot) throw new Error("Availability not found");
-  if (slot.isBooked) throw new Error("Booked slot cannot be deleted");
+  if (!slot) throw new AppError(status.NOT_FOUND, "Availability not found");
+  
+  if (slot.isBooked) {
+    throw new AppError(
+      status.CONFLICT,
+      "A booked 30-day package slot cannot be securely deleted"
+    );
+  }
 
   return prisma.tutorAvailability.delete({
     where: { id: availabilityId },

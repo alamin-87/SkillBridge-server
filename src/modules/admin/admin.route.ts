@@ -1,16 +1,29 @@
 import { Router } from "express";
 import { AdminController } from "./admin.controller";
-import  authMiddleWare  from "../../middleware/checkAuth";
+import authMiddleWare from "../../middleware/checkAuth";
 import { UserRole } from "../../types/user/userType";
 
 const router = Router();
-router.get("/", authMiddleWare(UserRole.ADMIN), AdminController.getDashboardStats);
-router.get("/users", authMiddleWare(UserRole.ADMIN), AdminController.getAllUsers);
-router.get("/bookings", authMiddleWare(UserRole.ADMIN), AdminController.getAllBookings);
-router.get("/categories", authMiddleWare(UserRole.ADMIN), AdminController.getAllCategories);
-router.post("/categories", authMiddleWare(UserRole.ADMIN), AdminController.createCategory);
-router.patch("/users/:id", authMiddleWare(UserRole.ADMIN), AdminController.updateUserStatusOrRole);
-router.patch("/categories/:id", authMiddleWare(UserRole.ADMIN), AdminController.updateCategory);
-router.delete("/categories/:id", authMiddleWare(UserRole.ADMIN), AdminController.deleteCategory);
+
+// Apply strict ADMIN access control universally for all routes below
+router.use(authMiddleWare(UserRole.ADMIN));
+
+// User Management
+router.get("/users", AdminController.getAllUsers);
+router.get("/users/:id", AdminController.getUserDetails);
+router.patch("/users/:id", AdminController.updateUserStatusOrRole); // Kept for backwards compatibility
+router.patch("/users/:id/status", AdminController.updateUserStatus);
+router.patch("/users/:id/role", AdminController.updateUserRole);
+router.delete("/users/:id", AdminController.deleteUser);
+
+// Booking Management
+router.get("/bookings", AdminController.getAllBookings);
+router.delete("/bookings/:id", AdminController.deleteBooking);
+
+// Category Management natively handled by core Admin capabilities
+router.get("/categories", AdminController.getAllCategories);
+router.post("/categories", AdminController.createCategory);
+router.patch("/categories/:id", AdminController.updateCategory);
+router.delete("/categories/:id", AdminController.deleteCategory);
 
 export const AdminRoutes = router;

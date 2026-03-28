@@ -1,23 +1,43 @@
 import { Router } from "express";
 import { BookingController } from "./booking.controller";
-import  authMiddleWare  from "../../middleware/checkAuth";
+import authMiddleWare from "../../middleware/checkAuth";
 import { UserRole } from "../../types/user/userType";
 
 const router = Router();
 
-router.post("/", authMiddleWare(UserRole.TUTOR,UserRole.STUDENT,UserRole.ADMIN), BookingController.create);
-router.get("/", authMiddleWare(UserRole.TUTOR,UserRole.STUDENT), BookingController.getAll);
-router.get("/:id", authMiddleWare(UserRole.TUTOR,UserRole.STUDENT), BookingController.get);
+// Create 30-day recurring booking (student only generally, but kept existing roles)
+router.post(
+  "/",
+  authMiddleWare(UserRole.TUTOR, UserRole.STUDENT, UserRole.ADMIN),
+  BookingController.create
+);
+
+// Get bookings
+router.get(
+  "/",
+  authMiddleWare(UserRole.TUTOR, UserRole.STUDENT),
+  BookingController.getAll
+);
+
+// Get single booking
+router.get(
+  "/:id",
+  authMiddleWare(UserRole.TUTOR, UserRole.STUDENT),
+  BookingController.get
+);
+
+// Cancel booking
 router.patch(
   "/:id/cancel",
-  authMiddleWare(UserRole.TUTOR),
-  BookingController.cancel,
+  authMiddleWare(UserRole.TUTOR, UserRole.STUDENT), // upgraded to allow student
+  BookingController.cancel
 );
-// tutor only
+
+// Complete booking (tutor only)
 router.patch(
   "/:id/complete",
   authMiddleWare(UserRole.TUTOR),
-  BookingController.complete,
+  BookingController.complete
 );
 
 export const BookingRoutes = router;

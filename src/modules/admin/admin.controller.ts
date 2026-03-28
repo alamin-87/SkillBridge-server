@@ -1,79 +1,176 @@
 import type { Request, Response } from "express";
 import { AdminService } from "./admin.service";
+import catchAsync from "../../shared/catchAsync";
+import { sendResponse } from "../../shared/sendResponse";
+import status from "http-status";
 
 export const AdminController = {
-  getDashboardStats: async (_req: Request, res: Response) => {
-    const data = await AdminService.getDashboardStats();
-    res.json({ success: true, data });
-  },
-  getAllUsers: async (_req: Request, res: Response) => {
+  getAllUsers: catchAsync(async (_req: Request, res: Response) => {
     const data = await AdminService.getAllUsers();
-    res.json({ success: true, data });
-  },
-  updateUserStatusOrRole: async (req: Request, res: Response) => {
-    const { status, role } = req.body;
-    if (status !== undefined && status !== "ACTIVE" && status !== "BANNED") {
-      return res.status(400).json({
+    sendResponse(res, {
+      httpStatusCode: status.OK,
+      success: true,
+      message: "Users retrieved successfully",
+      data,
+    });
+  }),
+
+  getUserDetails: catchAsync(async (req: Request, res: Response) => {
+    const data = await AdminService.getUserDetails(req.params.id as string);
+    sendResponse(res, {
+      httpStatusCode: status.OK,
+      success: true,
+      message: "User details retrieved successfully",
+      data,
+    });
+  }),
+
+  updateUserStatusOrRole: catchAsync(async (req: Request, res: Response) => {
+    const { status: userStatus, role } = req.body;
+    
+    if (userStatus && userStatus !== "ACTIVE" && userStatus !== "BANNED") {
+      return res.status(status.BAD_REQUEST).json({
         success: false,
         message: "status must be ACTIVE or BANNED",
       });
     }
-    if (role !== undefined && role !== "STUDENT" && role !== "TUTOR" && role !== "ADMIN") {
-      return res.status(400).json({
+    
+    if (role && role !== "STUDENT" && role !== "TUTOR" && role !== "ADMIN") {
+      return res.status(status.BAD_REQUEST).json({
         success: false,
         message: "role must be STUDENT, TUTOR or ADMIN",
       });
     }
 
-    const data = await AdminService.updateUser(req.params.id as string, { status, role });
-
-    res.json({
+    const data = await AdminService.updateUser(req.params.id as string, { status: userStatus, role });
+    
+    sendResponse(res, {
+      httpStatusCode: status.OK,
       success: true,
-      message: "User updated",
+      message: "User updated successfully",
       data,
     });
-  },
+  }),
 
-  getAllBookings: async (_req: Request, res: Response) => {
+  updateUserStatus: catchAsync(async (req: Request, res: Response) => {
+    const { status: userStatus } = req.body;
+    if (userStatus !== "ACTIVE" && userStatus !== "BANNED") {
+      return res.status(status.BAD_REQUEST).json({
+        success: false,
+        message: "status must be ACTIVE or BANNED",
+      });
+    }
+
+    const data = await AdminService.updateUser(req.params.id as string, { status: userStatus });
+    sendResponse(res, {
+      httpStatusCode: status.OK,
+      success: true,
+      message: "User status updated successfully",
+      data,
+    });
+  }),
+
+  updateUserRole: catchAsync(async (req: Request, res: Response) => {
+    const { role } = req.body;
+    if (role !== "STUDENT" && role !== "TUTOR" && role !== "ADMIN") {
+      return res.status(status.BAD_REQUEST).json({
+        success: false,
+        message: "role must be STUDENT, TUTOR or ADMIN",
+      });
+    }
+
+    const data = await AdminService.updateUser(req.params.id as string, { role });
+    sendResponse(res, {
+      httpStatusCode: status.OK,
+      success: true,
+      message: "User role updated successfully",
+      data,
+    });
+  }),
+
+  deleteUser: catchAsync(async (req: Request, res: Response) => {
+    const data = await AdminService.deleteUser(req.params.id as string);
+    sendResponse(res, {
+      httpStatusCode: status.OK,
+      success: true,
+      message: "User permanently deleted",
+      data,
+    });
+  }),
+
+  getAllBookings: catchAsync(async (_req: Request, res: Response) => {
     const data = await AdminService.getAllBookings();
-    res.json({ success: true, data });
-  },
+    sendResponse(res, {
+      httpStatusCode: status.OK,
+      success: true,
+      message: "Bookings retrieved successfully",
+      data,
+    });
+  }),
 
-  getAllCategories: async (_req: Request, res: Response) => {
+  deleteBooking: catchAsync(async (req: Request, res: Response) => {
+    const data = await AdminService.deleteBooking(req.params.id as string);
+    sendResponse(res, {
+      httpStatusCode: status.OK,
+      success: true,
+      message: "Booking thoroughly deleted",
+      data,
+    });
+  }),
+
+  getAllCategories: catchAsync(async (_req: Request, res: Response) => {
     const data = await AdminService.getAllCategories();
-    res.json({ success: true, data });
-  },
+    sendResponse(res, {
+      httpStatusCode: status.OK,
+      success: true,
+      message: "Categories retrieved successfully",
+      data,
+    });
+  }),
 
-  createCategory: async (req: Request, res: Response) => {
+  createCategory: catchAsync(async (req: Request, res: Response) => {
     const { name } = req.body;
-
     if (typeof name !== "string" || !name.trim()) {
-      return res.status(400).json({
+      return res.status(status.BAD_REQUEST).json({
         success: false,
         message: "Category name must be a non-empty string",
       });
     }
 
     const data = await AdminService.createCategory(name.trim());
-    res.status(201).json({ success: true, message: "Category created", data });
-  },
+    sendResponse(res, {
+      httpStatusCode: status.CREATED,
+      success: true,
+      message: "Category created successfully",
+      data,
+    });
+  }),
 
-  updateCategory: async (req: Request, res: Response) => {
+  updateCategory: catchAsync(async (req: Request, res: Response) => {
     const { name } = req.body;
-
     if (typeof name !== "string" || !name.trim()) {
-      return res.status(400).json({
+      return res.status(status.BAD_REQUEST).json({
         success: false,
         message: "Category name must be a non-empty string",
       });
     }
 
     const data = await AdminService.updateCategory(req.params.id as string, name.trim());
-    res.json({ success: true, message: "Category updated", data });
-  },
+    sendResponse(res, {
+      httpStatusCode: status.OK,
+      success: true,
+      message: "Category updated successfully",
+      data,
+    });
+  }),
 
-  deleteCategory: async (req: Request, res: Response) => {
+  deleteCategory: catchAsync(async (req: Request, res: Response) => {
     const data = await AdminService.deleteCategory(req.params.id as string);
-    res.json({ success: true, message: "Category deleted", data });
-  },
+    sendResponse(res, {
+      httpStatusCode: status.OK,
+      success: true,
+      message: "Category deleted securely",
+      data,
+    });
+  }),
 };

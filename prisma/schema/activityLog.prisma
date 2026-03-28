@@ -1,12 +1,12 @@
 model ActivityLog {
-  id        String   @id @default(cuid())
+  id String @id @default(cuid())
 
-  userId    String?
-  action    String
-  entity    String
-  entityId  String?
+  userId   String?
+  action   String
+  entity   String
+  entityId String?
 
-  metadata  Json?
+  metadata Json?
 
   createdAt DateTime @default(now())
 

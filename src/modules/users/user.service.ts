@@ -1,54 +1,100 @@
+import { deleteFileFromCloudinary, uploadFileToCloudinary } from "../../config/cloudinary.config";
+import AppError from "../../errorHelpers/AppError";
 import { prisma } from "../../lib/prisma";
+import status from "http-status";
 
-const getUser = (userId: string) => {
-  return prisma.user.findUnique({
-    where: { id: userId },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      role: true,
-      status: true,
-      image: true,
-      phone: true,
-    },
-  });
-};
-const getUserById = (id: string) => {
-  return prisma.user.findUnique({
-    where: { id },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      role: true,
-      status: true,
-      image: true,
-      phone: true,
-      createdAt: true,
-      updatedAt: true,
-    },
-  });
-};
-
-const updateUser = (
+// ✅ UPDATE USER (SELF ONLY)
+const updateUser = async (
   userId: string,
-  payload: { name?: string; image?: string | null; phone?: string | null },
+  payload: any,
+  file?: Express.Multer.File
 ) => {
-  return prisma.user.update({
+  const user = await prisma.user.findUnique({
     where: { id: userId },
-    data: payload,
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      role: true,
-      status: true,
-      image: true,
-      phone: true,
-      updatedAt: true,
+  });
+
+  if (!user || user.isDeleted) {
+    throw new AppError(status.NOT_FOUND, "User not found");
+  }
+
+  let profilePhotoData = {};
+
+  // 📸 If file exists → upload
+  if (file) {
+    const uploaded = await uploadFileToCloudinary(
+      file.buffer,
+      file.originalname
+    );
+
+    // 🧹 delete old image (if exists) - extract publicId from URL if needed
+    if (user.image) {
+      try {
+        // Try to extract publicId from the URL and delete
+        const urlParts = user.image.split("/");
+        const fileName = urlParts[urlParts.length - 1];
+        if (fileName) {
+          const publicId = fileName.split(".")[0];
+          if (publicId) {
+            await deleteFileFromCloudinary(publicId, "image");
+          }
+        }
+      } catch (err) {
+        // If extraction fails, just continue without deletion
+      }
+    }
+
+    profilePhotoData = {
+      image: uploaded.url,
+    };
+  }
+
+  const updatedUser = await prisma.user.update({
+    where: { id: userId },
+    data: {
+      ...payload,
+      ...profilePhotoData,
     },
   });
+
+  return updatedUser;
 };
 
-export const UserService = { getUser, updateUser, getUserById };
+// ✅ GET USER BY ID
+const getById = async (userId: string) => {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+  });
+
+  if (!user || user.isDeleted) {
+    throw new AppError(status.NOT_FOUND, "User not found");
+  }
+
+  return user;
+};
+
+// ❌ DELETE USER (SOFT DELETE)
+const deleteUser = async (userId: string) => {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+  });
+
+  if (!user || user.isDeleted) {
+    throw new AppError(status.NOT_FOUND, "User not found");
+  }
+
+  const result = await prisma.user.update({
+    where: { id: userId },
+    data: {
+      isDeleted: true,
+      deletedAt: new Date(),
+    },
+  });
+
+  return result;
+};
+
+export const UserService = {
+  getById,
+  updateUser,
+  deleteUser,
+};

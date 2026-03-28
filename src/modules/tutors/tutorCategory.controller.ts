@@ -1,81 +1,83 @@
 import type { Request, Response } from "express";
+import catchAsync from "../../shared/catchAsync";
 import { TutorCategoryService } from "./tutorCategory.service";
+import type { TutorCategoryListQuery } from "./tutorCategory.service";
+
+const create = catchAsync(async (req: Request, res: Response) => {
+  const { tutorProfileId, categoryId } = req.body;
+  const userId = req.user!.userId;
+
+  const data = await TutorCategoryService.createTutorCategory(
+    tutorProfileId,
+    categoryId,
+    userId,
+  );
+
+  return res.status(201).json({
+    success: true,
+    message: "Category assigned to tutor",
+    data,
+  });
+});
+
+const getAll = catchAsync(async (req: Request, res: Response) => {
+  const tutorProfileId = req.params.tutorProfileId as string;
+  const { page, limit, sortBy, searchTerm } = req.query;
+
+  const q: TutorCategoryListQuery = {};
+  if (typeof page === "number") q.page = page;
+  if (typeof limit === "number") q.limit = limit;
+  if (typeof sortBy === "string") q.sortBy = sortBy;
+  if (typeof searchTerm === "string") q.searchTerm = searchTerm;
+
+  const result = await TutorCategoryService.getAllTutorCategories(
+    tutorProfileId,
+    q,
+  );
+
+  res.status(200).json({
+    success: true,
+    ...result,
+  });
+});
+
+const update = catchAsync(async (req: Request, res: Response) => {
+  const tutorProfileId = req.params.tutorProfileId as string;
+  const categoryId = req.params.categoryId as string;
+  const { name } = req.body;
+  const userId = req.user!.userId;
+
+  const data = await TutorCategoryService.updateCategoryNameForTutor(
+    tutorProfileId,
+    categoryId,
+    name,
+    userId,
+  );
+
+  res.json({ success: true, message: "Category updated", data });
+});
+
+const deleteOne = catchAsync(async (req: Request, res: Response) => {
+  const tutorProfileId = req.params.tutorProfileId as string;
+  const categoryId = req.params.categoryId as string;
+  const userId = req.user!.userId;
+
+  const data = await TutorCategoryService.deleteTutorCategory(
+    tutorProfileId,
+    categoryId,
+    userId,
+  );
+
+  return res.status(200).json({
+    success: true,
+    message: "Category removed from tutor successfully",
+    data,
+  });
+});
 
 export const TutorCategoryController = {
-  create: async (req: Request, res: Response) => {
-    const { tutorProfileId, categoryId } = req.body;
-
-    if (typeof tutorProfileId !== "string") {
-      return res.status(400).json({
-        success: false,
-        message: "tutorProfileId must be a string",
-      });
-    }
-
-    if (typeof categoryId !== "string") {
-      return res.status(400).json({
-        success: false,
-        message: "categoryId must be a string",
-      });
-    }
-
-    const data = await TutorCategoryService.createTutorCategory(
-      tutorProfileId,
-      categoryId,
-    );
-
-    return res.status(201).json({
-      success: true,
-      message: "Category assigned to tutor",
-      data,
-    });
-  },
-
-  getAll: async (req: Request, res: Response) => {
-    const { tutorProfileId } = req.params;
-
-    const data = await TutorCategoryService.getAllTutorCategories(
-      tutorProfileId as string,
-    );
-
-    res.status(200).json({
-      success: true,
-      data,
-    });
-  },
-  update: async (req: Request, res: Response) => {
-    const data = await TutorCategoryService.updateCategory(
-      req.params.id as string,
-      req.body.name,
-    );
-    res.json({ success: true, message: "Category updated", data });
-  },
-  deleteOne: async (req: Request, res: Response) => {
-    const { tutorProfileId, categoryId } = req.params;
-
-    if (typeof tutorProfileId !== "string" || typeof categoryId !== "string") {
-      return res.status(400).json({
-        success: false,
-        message: "tutorProfileId and categoryId must be strings",
-      });
-    }
-
-    try {
-      const data = await TutorCategoryService.deleteTutorCategory(
-        tutorProfileId,
-        categoryId,
-      );
-      return res.status(200).json({
-        success: true,
-        message: "Category removed from tutor successfully",
-        data,
-      });
-    } catch (err: any) {
-      // Prisma throws if record not found
-      return res.status(404).json({
-        success: false,
-        message: "Tutor category link not found",
-      });
-    }
-  },
+  create,
+  getAll,
+  update,
+  deleteOne,
 };

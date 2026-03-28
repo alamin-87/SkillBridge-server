@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f9f9f9;
+            border-radius: 8px;
+        }
+        .header {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 8px 8px 0 0;
+            text-align: center;
+        }
+        .content {
+            background: white;
+            padding: 30px;
+            border-radius: 0 0 8px 8px;
+        }
+        .info-box {
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        .rejection-reason {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 20px;
+            border-radius: 6px;
+            margin: 20px 0;
+            color: #495057;
+        }
+        .footer {
+            margin-top: 30px;
+            text-align: center;
+            color: #666;
+            font-size: 12px;
+        }
+        h2 {
+            color: #f5576c;
+            margin-top: 0;
+        }
+        h3 {
+            color: #f5576c;
+            margin-top: 20px;
+        }
+        .button {
+            display: inline-block;
+            padding: 12px 30px;
+            background-color: #667eea;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        ul {
+            list-style: none;
+            padding: 0;
+        }
+        li {
+            padding: 8px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Application Update</h1>
+            <p>Your tutor profile application status</p>
+        </div>
+        
+        <div class="content">
+            <h2>Hello <%= userName %>,</h2>
+            
+            <p>Thank you for your interest in becoming a tutor on SkillBridge. We appreciate the effort you put into your application.</p>
+
+            <div class="info-box">
+                <strong>📌 Application Status:</strong> <span style="color: #f5576c; font-weight: bold;">Not Approved</span>
+            </div>
+
+            <h3>Reason for the Decision:</h3>
+            <div class="rejection-reason">
+                <%= rejectionReason %>
+            </div>
+
+            <h3>What Can You Do Next?</h3>
+            <ul>
+                <li>Review the feedback provided above</li>
+                <li>Address the mentioned points in your profile</li>
+                <li>Resubmit your application after improvements</li>
+                <li>Contact our support team for more specific guidance</li>
+            </ul>
+
+            <h3>📞 We're Here to Help</h3>
+            <p>If you'd like more detailed feedback on your application or have questions about the requirements, feel free to reach out to our team:</p>
+            <ul>
+                <li><strong>Email:</strong> support@skillbridge.com</li>
+                <li><strong>Response Time:</strong> Usually within 24 hours</li>
+            </ul>
+
+            <p style="margin-top: 30px;">We encourage you to reapply when you think your profile meets all our requirements. We look forward to seeing you as a SkillBridge tutor soon!</p>
+
+            <p>Best regards,<br/><strong>Team SkillBridge</strong></p>
+
+            <div class="footer">
+                <p>© 2026 SkillBridge. All rights reserved.<br/>
+                This is an automated message, please do not reply directly.</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

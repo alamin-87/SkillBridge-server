@@ -30,9 +30,11 @@ export class QueryBuilder<
     private queryParams: IQueryParams,
     private config: IQueryConfig = {},
   ) {
-    // 🔒 Soft delete protection by default
+    const defaultWhere =
+      this.config.applySoftDeleteDefault === false ? {} : { isDeleted: false };
+
     this.query = {
-      where: { isDeleted: false },
+      where: defaultWhere,
       include: {},
       orderBy: {},
       skip: 0,
@@ -40,7 +42,7 @@ export class QueryBuilder<
     };
 
     this.countQuery = {
-      where: { isDeleted: false },
+      where: defaultWhere,
     };
   }
 
@@ -278,6 +280,17 @@ export class QueryBuilder<
 
   async count(): Promise<number> {
     return this.model.count(this.countQuery as any);
+  }
+
+  async findFirst(): Promise<T | null> {
+    if (!this.model.findFirst) {
+      throw new Error("Model delegate does not implement findFirst");
+    }
+    return this.model.findFirst({
+      where: this.query.where,
+      include: this.query.include,
+      select: this.query.select,
+    }) as Promise<T | null>;
   }
 
   getQuery() {

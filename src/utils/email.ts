@@ -50,7 +50,7 @@ export const sendEmail = async ({
     // Template path
     const templatePath = path.resolve(
       process.cwd(),
-      `src/app/templates/${templateName}.ejs`
+      `src/templates/${templateName}.ejs`
     );
 
     // Check template exists
