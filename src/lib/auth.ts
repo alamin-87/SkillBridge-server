@@ -88,8 +88,9 @@ export const auth = betterAuth({
     emailOTP({
       overrideDefaultEmailVerification: true,
       async sendVerificationOTP({ email, otp, type }) {
+        console.log(`[AUTH] Sending OTP for ${email}, type: ${type}`);
         const user = await prisma.user.findUnique({ where: { email } });
-        if (!user) return;
+        
         if (user && user.role === UserRole.ADMIN) {
           console.log(
             `User with email ${email} is a super admin. Skipping sending verification OTP.`,
@@ -97,21 +98,22 @@ export const auth = betterAuth({
           return;
         }
 
-        if (type === "email-verification" && !user.emailVerified) {
+        if (type === "email-verification") {
           await sendEmail({
             to: email,
             subject: "SkillBridge Email Verification",
             templateName: "otp",
-            templateData: { name: user.name, otp },
+            templateData: { name: user?.name || "Welcome", otp },
           });
         }
 
         if (type === "forget-password") {
+          if (!user) return; // Only block if it's forget password and user doesn't exist
           await sendEmail({
             to: email,
             subject: "SkillBridge Password Reset OTP",
             templateName: "otp",
-            templateData: { name: user.name, otp },
+            templateData: { name: user?.name || "User", otp },
           });
         }
       },

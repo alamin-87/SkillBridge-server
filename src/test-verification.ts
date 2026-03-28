@@ -1,0 +1,1 @@
+import { prisma } from './lib/prisma'; import fs from 'fs'; prisma.verification.findMany().then(r => fs.writeFileSync('verification_output.json', JSON.stringify(r))).catch(console.error).finally(()=>process.exit(0));

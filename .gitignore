@@ -11,3 +11,4 @@ api
 .vercel
 
 .vercel
+.env*.local

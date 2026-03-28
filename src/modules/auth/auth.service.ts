@@ -1,6 +1,7 @@
 import status from "http-status";
 import { prisma } from "../../lib/prisma";
 import { auth } from "../../lib/auth";
+import { hashPassword } from "better-auth/crypto";
 import AppError from "../../errorHelpers/AppError";
 import { UserStatus, UserRole } from "../../../generated/prisma/enums";
 import { sendEmail } from "../../utils/email";
@@ -149,18 +150,29 @@ const logoutUser = async (headers: Record<string, string>) => {
 };
 
 const verifyEmail = async (email: string, otp: string) => {
-  // Find the verification record - check both possible identifier formats
+  // Find the verification record - check all possible identifier formats
   const verification = await prisma.verification.findFirst({
     where: {
       OR: [
         { identifier: `email:${email}` },
         { identifier: email },
+        { identifier: `email-verification-otp-${email}` },
       ],
       expiresAt: { gt: new Date() },
     },
+    orderBy: { createdAt: "desc" },
   });
 
-  if (!verification || verification.value !== otp) {
+  if (!verification) {
+    throw new AppError(status.BAD_REQUEST, "Invalid or expired OTP");
+  }
+
+  // better-auth might store value as "123456:0" where 0 is the attempt count
+  const storedOtp = verification.value.includes(":") 
+    ? verification.value.split(":")[0] 
+    : verification.value;
+
+  if (storedOtp !== otp) {
     throw new AppError(status.BAD_REQUEST, "Invalid or expired OTP");
   }
 
@@ -184,22 +196,31 @@ const resendOtp = async (email: string) => {
     throw new AppError(status.NOT_FOUND, "User not found");
   }
 
-  // Check for active verification record with both possible identifier formats
+  // Check for active verification record with all possible identifier formats
   const activeVerification = await prisma.verification.findFirst({
     where: {
-      OR: [{ identifier: `email:${email}` }, { identifier: email }],
+      OR: [
+        { identifier: `email:${email}` }, 
+        { identifier: email },
+        { identifier: `email-verification-otp-${email}` }
+      ],
       expiresAt: { gt: new Date() },
     },
+    orderBy: { createdAt: "desc" },
   });
 
   // If active OTP exists, inform user it's still valid
   if (activeVerification) {
+    const storedOtp = activeVerification.value.includes(":") 
+      ? activeVerification.value.split(":")[0] 
+      : activeVerification.value;
+
     // Resend the existing OTP
     await sendEmail({
       to: email,
       subject: "SkillBridge Email Verification OTP",
       templateName: "otp",
-      templateData: { name: user.name, otp: activeVerification.value },
+      templateData: { name: user.name, otp: storedOtp },
     });
 
     return { message: "OTP has been resent. Check your email." };
@@ -212,7 +233,11 @@ const resendOtp = async (email: string) => {
   // Delete old email verification records
   await prisma.verification.deleteMany({
     where: {
-      OR: [{ identifier: `email:${email}` }, { identifier: email }],
+      OR: [
+        { identifier: `email:${email}` }, 
+        { identifier: email },
+        { identifier: `email-verification-otp-${email}` }
+      ],
     },
   });
 
@@ -263,8 +288,15 @@ const forgetPassword = async (email: string) => {
     },
   });
 
-  // OTP would be sent by the controller if needed
-  return { otp };
+  // Send OTP email
+  await sendEmail({
+    to: email,
+    subject: "SkillBridge Password Reset OTP",
+    templateName: "otp",
+    templateData: { name: user.name, otp },
+  });
+
+  return { message: "Password reset OTP sent to your email" };
 };
 
 const resetPassword = async (
@@ -291,15 +323,14 @@ const resetPassword = async (
     throw new AppError(status.BAD_REQUEST, "Invalid or expired OTP");
   }
 
-  // Update password using better-auth
-  await auth.api.resetPassword(
-    {
-      body: {
-        token: otp,
-        password: newPassword,
-      },
-    } as any,
-  );
+  // Hash the new password using better-auth's native hasher
+  const hashedPassword = await hashPassword(newPassword);
+
+  // Update password in Account table
+  await prisma.account.updateMany({
+    where: { userId: user.id },
+    data: { password: hashedPassword },
+  });
 
   // Delete the verification record
   await prisma.verification.delete({

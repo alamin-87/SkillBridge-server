@@ -646,28 +646,29 @@ var auth = betterAuth({
     emailOTP({
       overrideDefaultEmailVerification: true,
       async sendVerificationOTP({ email, otp, type }) {
+        console.log(`[AUTH] Sending OTP for ${email}, type: ${type}`);
         const user = await prisma.user.findUnique({ where: { email } });
-        if (!user) return;
         if (user && user.role === UserRole.ADMIN) {
           console.log(
             `User with email ${email} is a super admin. Skipping sending verification OTP.`
           );
           return;
         }
-        if (type === "email-verification" && !user.emailVerified) {
+        if (type === "email-verification") {
           await sendEmail({
             to: email,
             subject: "SkillBridge Email Verification",
             templateName: "otp",
-            templateData: { name: user.name, otp }
+            templateData: { name: user?.name || "Welcome", otp }
           });
         }
         if (type === "forget-password") {
+          if (!user) return;
           await sendEmail({
             to: email,
             subject: "SkillBridge Password Reset OTP",
             templateName: "otp",
-            templateData: { name: user.name, otp }
+            templateData: { name: user?.name || "User", otp }
           });
         }
       },
@@ -3372,6 +3373,7 @@ import { Router as Router8 } from "express";
 
 // src/modules/auth/auth.service.ts
 import status20 from "http-status";
+import { hashPassword } from "better-auth/crypto";
 var registerUser = async (payload) => {
   const { name, email, password } = payload;
   const data = await auth.api.signUpEmail({
@@ -3486,12 +3488,18 @@ var verifyEmail = async (email, otp) => {
     where: {
       OR: [
         { identifier: `email:${email}` },
-        { identifier: email }
+        { identifier: email },
+        { identifier: `email-verification-otp-${email}` }
       ],
       expiresAt: { gt: /* @__PURE__ */ new Date() }
-    }
+    },
+    orderBy: { createdAt: "desc" }
   });
-  if (!verification || verification.value !== otp) {
+  if (!verification) {
+    throw new AppError_default(status20.BAD_REQUEST, "Invalid or expired OTP");
+  }
+  const storedOtp = verification.value.includes(":") ? verification.value.split(":")[0] : verification.value;
+  if (storedOtp !== otp) {
     throw new AppError_default(status20.BAD_REQUEST, "Invalid or expired OTP");
   }
   const user = await prisma.user.update({
@@ -3510,16 +3518,22 @@ var resendOtp = async (email) => {
   }
   const activeVerification = await prisma.verification.findFirst({
     where: {
-      OR: [{ identifier: `email:${email}` }, { identifier: email }],
+      OR: [
+        { identifier: `email:${email}` },
+        { identifier: email },
+        { identifier: `email-verification-otp-${email}` }
+      ],
       expiresAt: { gt: /* @__PURE__ */ new Date() }
-    }
+    },
+    orderBy: { createdAt: "desc" }
   });
   if (activeVerification) {
+    const storedOtp = activeVerification.value.includes(":") ? activeVerification.value.split(":")[0] : activeVerification.value;
     await sendEmail({
       to: email,
       subject: "SkillBridge Email Verification OTP",
       templateName: "otp",
-      templateData: { name: user.name, otp: activeVerification.value }
+      templateData: { name: user.name, otp: storedOtp }
     });
     return { message: "OTP has been resent. Check your email." };
   }
@@ -3527,7 +3541,11 @@ var resendOtp = async (email) => {
   const expiresAt = new Date(Date.now() + 10 * 60 * 1e3);
   await prisma.verification.deleteMany({
     where: {
-      OR: [{ identifier: `email:${email}` }, { identifier: email }]
+      OR: [
+        { identifier: `email:${email}` },
+        { identifier: email },
+        { identifier: `email-verification-otp-${email}` }
+      ]
     }
   });
   await prisma.verification.create({
@@ -3564,7 +3582,13 @@ var forgetPassword = async (email) => {
       expiresAt
     }
   });
-  return { otp };
+  await sendEmail({
+    to: email,
+    subject: "SkillBridge Password Reset OTP",
+    templateName: "otp",
+    templateData: { name: user.name, otp }
+  });
+  return { message: "Password reset OTP sent to your email" };
 };
 var resetPassword = async (email, otp, newPassword) => {
   const user = await prisma.user.findUnique({ where: { email } });
@@ -3581,14 +3605,11 @@ var resetPassword = async (email, otp, newPassword) => {
   if (!verification) {
     throw new AppError_default(status20.BAD_REQUEST, "Invalid or expired OTP");
   }
-  await auth.api.resetPassword(
-    {
-      body: {
-        token: otp,
-        password: newPassword
-      }
-    }
-  );
+  const hashedPassword = await hashPassword(newPassword);
+  await prisma.account.updateMany({
+    where: { userId: user.id },
+    data: { password: hashedPassword }
+  });
   await prisma.verification.delete({
     where: { id: verification.id }
   });
