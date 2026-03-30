@@ -2429,7 +2429,7 @@ var uploadFileToCloudinary = async (buffer, fileName, folderPrefix = "SkillBridg
     cloudinary.uploader.upload_stream(
       {
         resource_type: extension === "pdf" ? "raw" : "auto",
-        public_id: `${folderPrefix}/${folder}/${uniqueName}`,
+        public_id: uniqueName,
         folder: `${folderPrefix}/${folder}`
       },
       (error, result2) => {
@@ -2458,16 +2458,17 @@ var updateUser = async (userId, payload, file) => {
   if (file) {
     const uploaded = await uploadFileToCloudinary(
       file.buffer,
-      file.originalname
+      file.originalname,
+      "SkillBridge"
     );
-    if (user.image) {
+    if (user.image && user.image.includes("cloudinary.com")) {
       try {
         const urlParts = user.image.split("/");
         const fileName = urlParts[urlParts.length - 1];
         if (fileName) {
           const publicId = fileName.split(".")[0];
           if (publicId) {
-            await deleteFileFromCloudinary(publicId, "image");
+            await deleteFileFromCloudinary(`SkillBridge/images/${publicId}`, "image");
           }
         }
       } catch (err) {
@@ -2599,6 +2600,8 @@ var storage = new CloudinaryStorage({
   }
 });
 var multerUpload = multer({ storage });
+var memoryStorage = multer.memoryStorage();
+var multerMemoryUpload = multer({ storage: memoryStorage });
 
 // src/modules/users/user.route.ts
 var router7 = Router6();
@@ -2615,7 +2618,7 @@ router7.get(
 router7.patch(
   "/me",
   checkAuth_default(),
-  multerUpload.fields([
+  multerMemoryUpload.fields([
     { name: "profilePhoto", maxCount: 1 }
   ]),
   validateRequest(updateUserSchema),
@@ -4106,16 +4109,17 @@ var updateTutorProfile = async (userId, payload, file) => {
   if (file) {
     const uploaded = await uploadFileToCloudinary(
       file.buffer,
-      file.originalname
+      file.originalname,
+      "SkillBridge"
     );
-    if (tutorProfile.profileImage) {
+    if (tutorProfile.profileImage && tutorProfile.profileImage.includes("cloudinary.com")) {
       try {
         const urlParts = tutorProfile.profileImage.split("/");
         const fileName = urlParts[urlParts.length - 1];
         if (fileName) {
           const publicId = fileName.split(".")[0];
           if (publicId) {
-            await deleteFileFromCloudinary(publicId, "image");
+            await deleteFileFromCloudinary(`SkillBridge/images/${publicId}`, "image");
           }
         }
       } catch (err) {
@@ -4362,7 +4366,7 @@ router10.patch(
 router10.patch(
   "/profile",
   checkAuth_default("TUTOR" /* TUTOR */),
-  multerUpload.fields([
+  multerMemoryUpload.fields([
     { name: "profileImage", maxCount: 1 }
   ]),
   validateRequest(updateTutorValidation),

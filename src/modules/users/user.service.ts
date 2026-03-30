@@ -19,23 +19,25 @@ const updateUser = async (
 
   let profilePhotoData = {};
 
-  // 📸 If file exists → upload
+  // 📸 If file exists → upload via buffer (since we switched to multerMemoryUpload)
   if (file) {
     const uploaded = await uploadFileToCloudinary(
       file.buffer,
-      file.originalname
+      file.originalname,
+      "SkillBridge"
     );
 
     // 🧹 delete old image (if exists) - extract publicId from URL if needed
-    if (user.image) {
+    if (user.image && user.image.includes("cloudinary.com")) {
       try {
         // Try to extract publicId from the URL and delete
         const urlParts = user.image.split("/");
         const fileName = urlParts[urlParts.length - 1];
         if (fileName) {
           const publicId = fileName.split(".")[0];
+          // Since our uploadFileToCloudinary sets the prefix
           if (publicId) {
-            await deleteFileFromCloudinary(publicId, "image");
+            await deleteFileFromCloudinary(`SkillBridge/images/${publicId}`, "image");
           }
         }
       } catch (err) {

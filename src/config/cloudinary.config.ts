@@ -42,7 +42,7 @@ export const uploadFileToCloudinary = async (
       .upload_stream(
         {
           resource_type: extension === "pdf" ? "raw" : "auto",
-          public_id: `${folderPrefix}/${folder}/${uniqueName}`,
+          public_id: uniqueName,
           folder: `${folderPrefix}/${folder}`,
         },
         (error, result) => {

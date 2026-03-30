@@ -346,22 +346,23 @@ const updateTutorProfile = async (
   const { categories: categoryNames, ...otherPayload } = payload;
   let profileImageData = {};
 
-  // 📸 If file exists → upload to Cloudinary
+  // 📸 If file exists → upload to Cloudinary via buffer (multerMemoryUpload)
   if (file) {
     const uploaded = await uploadFileToCloudinary(
       file.buffer,
-      file.originalname
+      file.originalname,
+      "SkillBridge"
     );
 
     // 🧹 delete old image (if exists)
-    if (tutorProfile.profileImage) {
+    if (tutorProfile.profileImage && tutorProfile.profileImage.includes("cloudinary.com")) {
       try {
         const urlParts = tutorProfile.profileImage.split("/");
         const fileName = urlParts[urlParts.length - 1];
         if (fileName) {
           const publicId = fileName.split(".")[0];
           if (publicId) {
-            await deleteFileFromCloudinary(publicId, "image");
+            await deleteFileFromCloudinary(`SkillBridge/images/${publicId}`, "image");
           }
         }
       } catch (err) {

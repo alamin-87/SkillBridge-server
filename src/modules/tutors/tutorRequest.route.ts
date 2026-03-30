@@ -9,7 +9,7 @@ import {
   updateTutorValidation,
 } from "./tutorRequest.validation";
 import { UserRole } from "../../types/user/userType";
-import { multerUpload } from "../../config/multer.config";
+import { multerUpload, multerMemoryUpload } from "../../config/multer.config";
 
 const router = Router();
 
@@ -69,7 +69,7 @@ router.patch(
 router.patch(
   "/profile",
   authMiddleWare(UserRole.TUTOR),
-  multerUpload.fields([
+  multerMemoryUpload.fields([
     { name: "profileImage", maxCount: 1 },
   ]),
   validateRequest(updateTutorValidation),

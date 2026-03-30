@@ -4,7 +4,7 @@ import  authMiddleWare  from "../../middleware/checkAuth";
 import { UserRole } from "../../types/user/userType";
 import { validateRequest } from "../../middleware/validateRequest";
 import { updateUserSchema } from "./user.validation";
-import { multerUpload } from "../../config/multer.config";
+import { multerUpload, multerMemoryUpload } from "../../config/multer.config";
 
 const router = Router();
 
@@ -22,7 +22,7 @@ router.get(
 router.patch(
   "/me",
   authMiddleWare(),
-   multerUpload.fields([
+   multerMemoryUpload.fields([
     { name: "profilePhoto", maxCount: 1 },
   ]),
   validateRequest(updateUserSchema),
