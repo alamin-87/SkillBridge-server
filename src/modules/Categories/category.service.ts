@@ -1,6 +1,7 @@
 import { prisma } from "../../lib/prisma";
 import AppError from "../../errorHelpers/AppError";
 import status from "http-status";
+import { QueryBuilder } from "../../utils/QueryBuilder";
 
 const createCategory = async (name: string) => {
   // Check if category already exists
@@ -17,15 +18,38 @@ const createCategory = async (name: string) => {
   });
 };
 
-const getAllCategories = async () => {
-  return prisma.category.findMany({
-    orderBy: { createdAt: "desc" },
-    include: {
-      _count: {
-        select: { tutorLinks: true },
-      },
-    },
-  });
+const getAllCategories = async (query: Record<string, unknown>) => {
+  const categoryQuery = new QueryBuilder(
+    prisma.category as any,
+    query,
+    {
+      searchableFields: ["name"],
+      filterableFields: ["name"],
+      applySoftDeleteDefault: false,
+    }
+  )
+    .search()
+    .filter()
+    .sort()
+    .paginate()
+    .include({
+      tutorLinks: true
+    });
+
+  const result = await categoryQuery.execute();
+  
+  // To keep payload small and compatible with existing front-end structure if needed,
+  // we can map the _count manually if we want, or just return the data.
+  // The frontend expects tutorCount. Let's map it.
+  const mappedData = result.data.map((cat: any) => ({
+    ...cat,
+    _count: { tutorLinks: cat.tutorLinks?.length || 0 }
+  }));
+
+  return {
+    meta: result.meta,
+    data: mappedData
+  };
 };
 
 const linkTutorCategories = async (userId: string, categoryIds: string[]) => {

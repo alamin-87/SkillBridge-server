@@ -995,37 +995,14 @@ var getAllTutors = async (query) => {
   const queryParams = {
     page: query.page ?? 1,
     limit: query.limit ?? 10,
-    sortBy: query.sortBy ?? "-avgRating,hourlyRate"
+    sortBy: query.sortBy ?? "-avgRating,hourlyRate",
+    ...trimmedSearch ? { searchTerm: trimmedSearch } : {}
   };
-  const searchOr = trimmedSearch ? {
-    OR: [
-      { bio: { contains: trimmedSearch, mode: "insensitive" } },
-      {
-        user: {
-          name: { contains: trimmedSearch, mode: "insensitive" }
-        }
-      },
-      {
-        categories: {
-          some: {
-            category: {
-              name: {
-                contains: trimmedSearch,
-                mode: "insensitive"
-              }
-            }
-          }
-        }
-      }
-    ]
-  } : {};
   const qb = new QueryBuilder(prisma.tutorProfile, queryParams, {
-    applySoftDeleteDefault: false
+    applySoftDeleteDefault: false,
+    searchableFields: ["bio", "user.name", "categories.category.name"]
   });
-  qb.where({
-    user: { role: "TUTOR", status: "ACTIVE" },
-    ...searchOr
-  });
+  qb.search().where({ user: { role: "TUTOR", status: "ACTIVE" } });
   if (query.minRating !== void 0) {
     qb.where({ avgRating: { gte: query.minRating } });
   }
@@ -1033,9 +1010,7 @@ var getAllTutors = async (query) => {
     qb.where({ hourlyRate: { lte: query.maxPrice } });
   }
   if (query.categoryId) {
-    qb.where({
-      categories: { some: { categoryId: query.categoryId } }
-    });
+    qb.where({ categories: { some: { categoryId: query.categoryId } } });
   }
   qb.include({
     user: { select: { id: true, name: true, image: true } },
@@ -1231,15 +1206,27 @@ var createCategory = async (name) => {
     data: { name }
   });
 };
-var getAllCategories = async () => {
-  return prisma.category.findMany({
-    orderBy: { createdAt: "desc" },
-    include: {
-      _count: {
-        select: { tutorLinks: true }
-      }
+var getAllCategories = async (query) => {
+  const categoryQuery = new QueryBuilder(
+    prisma.category,
+    query,
+    {
+      searchableFields: ["name"],
+      filterableFields: ["name"],
+      applySoftDeleteDefault: false
     }
+  ).search().filter().sort().paginate().include({
+    tutorLinks: true
   });
+  const result = await categoryQuery.execute();
+  const mappedData = result.data.map((cat) => ({
+    ...cat,
+    _count: { tutorLinks: cat.tutorLinks?.length || 0 }
+  }));
+  return {
+    meta: result.meta,
+    data: mappedData
+  };
 };
 var linkTutorCategories = async (userId, categoryIds) => {
   const tutorProfile = await prisma.tutorProfile.findUnique({
@@ -1345,13 +1332,14 @@ var CategoryController = {
       data
     });
   }),
-  getAll: catchAsync_default(async (_req, res) => {
-    const data = await CategoryService.getAllCategories();
+  getAll: catchAsync_default(async (req, res) => {
+    const data = await CategoryService.getAllCategories(req.query);
     sendResponse(res, {
       httpStatusCode: status5.OK,
       success: true,
       message: "Categories retrieved successfully",
-      data
+      meta: data.meta,
+      data: data.data
     });
   }),
   linkCategories: catchAsync_default(async (req, res) => {
@@ -2530,6 +2518,15 @@ var UserService = {
 };
 
 // src/modules/users/user.controller.ts
+var getMe = catchAsync_default(async (req, res) => {
+  const result = await UserService.getById(req.user.userId);
+  sendResponse(res, {
+    httpStatusCode: status14.OK,
+    success: true,
+    message: "User retrieved successfully",
+    data: result
+  });
+});
 var getById2 = catchAsync_default(async (req, res) => {
   const result = await UserService.getById(req.params.id);
   sendResponse(res, {
@@ -2565,6 +2562,7 @@ var deleteUser2 = catchAsync_default(async (req, res) => {
   });
 });
 var UserController = {
+  getMe,
   getById: getById2,
   updateUser: updateUser2,
   deleteUser: deleteUser2
@@ -2573,10 +2571,16 @@ var UserController = {
 // src/modules/users/user.validation.ts
 import { z as z2 } from "zod";
 var updateUserSchema = z2.object({
-  name: z2.string().optional(),
-  profilePhoto: z2.string().optional(),
-  contactNumber: z2.string().optional(),
-  address: z2.string().optional()
+  body: z2.object({
+    name: z2.string().optional(),
+    email: z2.string().email().optional(),
+    phone: z2.string().nullable().optional(),
+    /** URL-based image update */
+    image: z2.string().url().nullable().optional(),
+    /** Legacy fields kept for compatibility */
+    contactNumber: z2.string().nullable().optional(),
+    address: z2.string().nullable().optional()
+  })
 });
 
 // src/config/multer.config.ts
@@ -2598,6 +2602,11 @@ var multerUpload = multer({ storage });
 
 // src/modules/users/user.route.ts
 var router7 = Router6();
+router7.get(
+  "/me",
+  checkAuth_default(),
+  UserController.getMe
+);
 router7.get(
   "/:id",
   checkAuth_default(),
@@ -3455,7 +3464,7 @@ var loginUser = async (payload) => {
     // Return the synced database user
   };
 };
-var getMe = async (userId) => {
+var getMe2 = async (userId) => {
   const user = await prisma.user.findUnique({
     where: { id: userId }
   });
@@ -3643,7 +3652,7 @@ var googleLoginSuccess = async (session) => {
 var AuthService = {
   registerUser,
   loginUser,
-  getMe,
+  getMe: getMe2,
   logoutUser,
   verifyEmail,
   resendOtp,
@@ -3672,7 +3681,7 @@ var loginUser2 = catchAsync_default(async (req, res) => {
     data: result
   });
 });
-var getMe2 = catchAsync_default(async (req, res) => {
+var getMe3 = catchAsync_default(async (req, res) => {
   const result = await AuthService.getMe(req.user.userId);
   sendResponse(res, {
     httpStatusCode: status21.OK,
@@ -3750,7 +3759,7 @@ var handleOAuthError = catchAsync_default(async (req, res) => {
 var AuthController = {
   registerUser: registerUser2,
   loginUser: loginUser2,
-  getMe: getMe2,
+  getMe: getMe3,
   logoutUser: logoutUser2,
   verifyEmail: verifyEmail2,
   resendOtp: resendOtp2,
@@ -3839,6 +3848,11 @@ var tutorProfileSelect = {
   isApproved: true,
   createdAt: true,
   updatedAt: true,
+  categories: {
+    include: {
+      category: true
+    }
+  },
   user: {
     select: {
       id: true,
@@ -4087,6 +4101,7 @@ var updateTutorProfile = async (userId, payload, file) => {
   if (!tutorProfile) {
     throw new AppError_default(status22.NOT_FOUND, "Tutor profile not found");
   }
+  const { categories: categoryNames, ...otherPayload } = payload;
   let profileImageData = {};
   if (file) {
     const uploaded = await uploadFileToCloudinary(
@@ -4110,15 +4125,41 @@ var updateTutorProfile = async (userId, payload, file) => {
       profileImage: uploaded.url
     };
   }
-  const updatedProfile = await prisma.tutorProfile.update({
-    where: { userId },
-    data: {
-      ...payload,
-      ...profileImageData
-    },
-    select: tutorProfileSelect
+  const result = await prisma.$transaction(async (tx) => {
+    await tx.tutorProfile.update({
+      where: { userId },
+      data: {
+        ...otherPayload,
+        ...profileImageData
+      }
+    });
+    if (categoryNames !== void 0) {
+      const categories = await tx.category.findMany({
+        where: {
+          name: {
+            in: categoryNames,
+            mode: "insensitive"
+          }
+        }
+      });
+      await tx.tutorCategory.deleteMany({
+        where: { tutorProfileId: tutorProfile.id }
+      });
+      if (categories.length > 0) {
+        await tx.tutorCategory.createMany({
+          data: categories.map((cat) => ({
+            tutorProfileId: tutorProfile.id,
+            categoryId: cat.id
+          }))
+        });
+      }
+    }
+    return tx.tutorProfile.findUnique({
+      where: { userId },
+      select: tutorProfileSelect
+    });
   });
-  return updatedProfile;
+  return result;
 };
 var TutorService = {
   createTutor,
@@ -4263,12 +4304,13 @@ var createTutorRequestValidation = z6.object({
 });
 var updateTutorValidation = z6.object({
   body: z6.object({
-    bio: z6.string().min(10).optional(),
-    hourlyRate: z6.number().positive().optional(),
+    bio: z6.string().optional(),
+    hourlyRate: z6.number().nonnegative().optional(),
     experienceYrs: z6.number().int().nonnegative().optional(),
     location: z6.string().optional(),
     languages: z6.string().optional(),
-    profileImage: z6.string().url("Invalid URL").optional()
+    profileImage: z6.string().nullable().optional(),
+    categories: z6.array(z6.string()).optional()
   })
 });
 var rejectTutorRequestValidation = z6.object({

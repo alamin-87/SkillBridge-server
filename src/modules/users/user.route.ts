@@ -9,6 +9,12 @@ import { multerUpload } from "../../config/multer.config";
 const router = Router();
 
 router.get(
+  "/me",
+  authMiddleWare(),
+  UserController.getMe
+);
+
+router.get(
   "/:id",
   authMiddleWare(),
   UserController.getById

@@ -31,12 +31,13 @@ export const createTutorRequestValidation = z.object({
 // ─── Update Tutor Profile ───────────────────────────────────────────────────────
 export const updateTutorValidation = z.object({
   body: z.object({
-    bio: z.string().min(10).optional(),
-    hourlyRate: z.number().positive().optional(),
+    bio: z.string().optional(),
+    hourlyRate: z.number().nonnegative().optional(),
     experienceYrs: z.number().int().nonnegative().optional(),
     location: z.string().optional(),
     languages: z.string().optional(),
-    profileImage: z.string().url("Invalid URL").optional(),
+    profileImage: z.string().nullable().optional(),
+    categories: z.array(z.string()).optional(),
   }),
 });
 

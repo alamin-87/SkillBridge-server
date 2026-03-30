@@ -3,6 +3,18 @@ import { sendResponse } from "../../shared/sendResponse";
 import status from "http-status";
 import { UserService } from "./user.service";
 
+// GET ME
+const getMe = catchAsync(async (req: any, res) => {
+  const result = await UserService.getById(req.user.userId);
+
+  sendResponse(res, {
+    httpStatusCode: status.OK,
+    success: true,
+    message: "User retrieved successfully",
+    data: result,
+  });
+});
+
 // GET BY ID
 const getById = catchAsync(async (req: any, res) => {
   const result = await UserService.getById(req.params.id);
@@ -46,6 +58,7 @@ const deleteUser = catchAsync(async (req: any, res) => {
 });
 
 export const UserController = {
+  getMe,
   getById,
   updateUser,
   deleteUser,

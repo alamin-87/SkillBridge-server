@@ -26,6 +26,11 @@ const tutorProfileSelect = {
   isApproved: true,
   createdAt: true,
   updatedAt: true,
+  categories: {
+    include: {
+      category: true,
+    },
+  },
   user: {
     select: {
       id: true,
@@ -338,6 +343,7 @@ const updateTutorProfile = async (
     throw new AppError(status.NOT_FOUND, "Tutor profile not found");
   }
 
+  const { categories: categoryNames, ...otherPayload } = payload;
   let profileImageData = {};
 
   // 📸 If file exists → upload to Cloudinary
@@ -347,10 +353,9 @@ const updateTutorProfile = async (
       file.originalname
     );
 
-    // 🧹 delete old image (if exists) - extract publicId from URL if needed
+    // 🧹 delete old image (if exists)
     if (tutorProfile.profileImage) {
       try {
-        // Try to extract publicId from the URL and delete
         const urlParts = tutorProfile.profileImage.split("/");
         const fileName = urlParts[urlParts.length - 1];
         if (fileName) {
@@ -360,7 +365,7 @@ const updateTutorProfile = async (
           }
         }
       } catch (err) {
-        // If extraction fails, just continue without deletion
+        // ignore
       }
     }
 
@@ -369,16 +374,52 @@ const updateTutorProfile = async (
     };
   }
 
-  const updatedProfile = await prisma.tutorProfile.update({
-    where: { userId },
-    data: {
-      ...payload,
-      ...profileImageData,
-    },
-    select: tutorProfileSelect,
+  const result = await prisma.$transaction(async (tx) => {
+    // 1. Update Profile Fields
+    await tx.tutorProfile.update({
+      where: { userId },
+      data: {
+        ...otherPayload,
+        ...profileImageData,
+      },
+    });
+
+    // 2. Handle Categories if provided
+    if (categoryNames !== undefined) {
+      // Find category IDs by name
+      const categories = await tx.category.findMany({
+        where: {
+          name: {
+            in: categoryNames,
+            mode: "insensitive",
+          },
+        },
+      });
+
+      // Delete existing
+      await tx.tutorCategory.deleteMany({
+        where: { tutorProfileId: tutorProfile.id },
+      });
+
+      // Create new ones
+      if (categories.length > 0) {
+        await tx.tutorCategory.createMany({
+          data: categories.map((cat) => ({
+            tutorProfileId: tutorProfile.id,
+            categoryId: cat.id,
+          })),
+        });
+      }
+    }
+
+    // Return with the full selection
+    return tx.tutorProfile.findUnique({
+      where: { userId },
+      select: tutorProfileSelect,
+    });
   });
 
-  return updatedProfile;
+  return result;
 };
 
 export const TutorService = {

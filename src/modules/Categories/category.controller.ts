@@ -34,14 +34,15 @@ export const CategoryController = {
     });
   }),
 
-  getAll: catchAsync(async (_req: Request, res: Response) => {
-    const data = await CategoryService.getAllCategories();
+  getAll: catchAsync(async (req: Request, res: Response) => {
+    const data = await CategoryService.getAllCategories(req.query);
     
     sendResponse(res, {
       httpStatusCode: status.OK,
       success: true,
       message: "Categories retrieved successfully",
-      data,
+      meta: data.meta,
+      data: data.data,
     });
   }),
 

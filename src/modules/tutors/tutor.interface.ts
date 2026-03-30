@@ -29,6 +29,7 @@ export interface IUpdateTutor {
   location?: string;
   languages?: string;
   profileImage?: string;
+  categories?: string[];
 }
 
 export interface ITutorApprovalPayload {

@@ -15,48 +15,22 @@ export type TutorListQuery = {
 
 const getAllTutors = async (query: TutorListQuery) => {
   const searchTerm = query.search ?? query.searchTerm;
-  const trimmedSearch =
-    typeof searchTerm === "string" ? searchTerm.trim() : "";
+  const trimmedSearch = typeof searchTerm === "string" ? searchTerm.trim() : "";
 
   const queryParams: IQueryParams = {
     page: query.page ?? 1,
     limit: query.limit ?? 10,
     sortBy: query.sortBy ?? "-avgRating,hourlyRate",
+    ...(trimmedSearch ? { searchTerm: trimmedSearch } : {}),
   };
-
-  const searchOr = trimmedSearch
-    ? {
-        OR: [
-          { bio: { contains: trimmedSearch, mode: "insensitive" as const } },
-          {
-            user: {
-              name: { contains: trimmedSearch, mode: "insensitive" as const },
-            },
-          },
-          {
-            categories: {
-              some: {
-                category: {
-                  name: {
-                    contains: trimmedSearch,
-                    mode: "insensitive" as const,
-                  },
-                },
-              },
-            },
-          },
-        ],
-      }
-    : {};
 
   const qb = new QueryBuilder(prisma.tutorProfile, queryParams, {
     applySoftDeleteDefault: false,
+    searchableFields: ["bio", "user.name", "categories.category.name"],
   });
 
-  qb.where({
-    user: { role: "TUTOR", status: "ACTIVE" },
-    ...searchOr,
-  });
+  qb.search()
+    .where({ user: { role: "TUTOR", status: "ACTIVE" } });
 
   if (query.minRating !== undefined) {
     qb.where({ avgRating: { gte: query.minRating } });
@@ -65,9 +39,7 @@ const getAllTutors = async (query: TutorListQuery) => {
     qb.where({ hourlyRate: { lte: query.maxPrice } });
   }
   if (query.categoryId) {
-    qb.where({
-      categories: { some: { categoryId: query.categoryId } },
-    });
+    qb.where({ categories: { some: { categoryId: query.categoryId } } });
   }
 
   qb.include({
