@@ -5,6 +5,13 @@ import { UserRole } from "../../types/user/userType";
 
 const router = Router();
 
+// Get All Payments (with role filtering)
+router.get(
+  "/",
+  authMiddleWare(UserRole.STUDENT, UserRole.TUTOR, UserRole.ADMIN),
+  PaymentController.getAllPayments
+);
+
 // Create Payment Intent for a Booking
 router.post(
   "/create-payment-intent",
@@ -24,6 +31,13 @@ router.get(
   "/:transactionId",
   authMiddleWare(UserRole.STUDENT, UserRole.TUTOR, UserRole.ADMIN),
   PaymentController.getPaymentDetails
+);
+
+// Fallback payment synchronization
+router.post(
+  "/sync",
+  authMiddleWare(UserRole.STUDENT),
+  PaymentController.syncPayment
 );
 
 export const PaymentRoutes = router;

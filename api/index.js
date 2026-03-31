@@ -683,8 +683,8 @@ var auth = betterAuth({
     // 1 day
     updateAge: 24 * 60 * 60,
     cookieCache: {
-      enabled: true,
-      maxAge: 24 * 60 * 60
+      enabled: false,
+      maxAge: 0
     }
   },
   // Redirect after social login
@@ -1935,7 +1935,7 @@ var createBooking = async (studentId, payload) => {
           scheduledStart: slot.startTime,
           scheduledEnd: slot.endTime,
           price: slotPackagePrice,
-          status: "CONFIRMED",
+          status: "PENDING",
           notes: thirtyDaysNotes
         }
       });
@@ -1943,8 +1943,16 @@ var createBooking = async (studentId, payload) => {
         data: {
           userId: tutorId,
           title: "New Booking Received",
-          message: `A student explicitly established a 30-day package structurally tying a fixed availability slot.`,
+          message: `A student booked a 30-day package with your availability slot.`,
           type: "BOOKING"
+        }
+      });
+      await tx.notification.create({
+        data: {
+          userId: studentId,
+          title: "Booking Created \u2013 Payment Required",
+          message: `Your booking has been created! Please complete payment to confirm your session.`,
+          type: "PAYMENT"
         }
       });
       return newBooking;
@@ -1957,7 +1965,7 @@ var createBooking = async (studentId, payload) => {
         scheduledStart: start,
         scheduledEnd: end,
         price: thirtyDaysPrice,
-        status: "CONFIRMED",
+        status: "PENDING",
         notes: thirtyDaysNotes
       }
     });
@@ -1965,8 +1973,16 @@ var createBooking = async (studentId, payload) => {
       data: {
         userId: tutorId,
         title: "New Booking Received",
-        message: `A student manually established a 30-day package structure outside generic slots.`,
+        message: `A student booked a 30-day package with custom scheduling.`,
         type: "BOOKING"
+      }
+    });
+    await tx.notification.create({
+      data: {
+        userId: studentId,
+        title: "Booking Created \u2013 Payment Required",
+        message: `Your booking has been created! Please complete payment to confirm your session.`,
+        type: "PAYMENT"
       }
     });
     return manualBooking;
@@ -2632,18 +2648,59 @@ import { Router as Router7 } from "express";
 
 // src/modules/admin/admin.service.ts
 import status15 from "http-status";
-var getAllUsers = async () => {
-  return prisma.user.findMany({
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      role: true,
-      status: true,
-      createdAt: true
-    },
-    orderBy: { createdAt: "desc" }
-  });
+var getAllUsers = async (query) => {
+  const page = Math.max(1, query?.page ?? 1);
+  const limit = Math.min(100, Math.max(1, query?.limit ?? 50));
+  const skip = (page - 1) * limit;
+  const where = {};
+  if (query?.search) {
+    where.OR = [
+      { name: { contains: query.search, mode: "insensitive" } },
+      { email: { contains: query.search, mode: "insensitive" } }
+    ];
+  }
+  if (query?.role && ["STUDENT", "TUTOR", "ADMIN"].includes(query.role)) {
+    where.role = query.role;
+  }
+  if (query?.status && ["ACTIVE", "BANNED"].includes(query.status)) {
+    where.status = query.status;
+  }
+  const [users, total] = await Promise.all([
+    prisma.user.findMany({
+      where,
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        image: true,
+        role: true,
+        status: true,
+        phone: true,
+        createdAt: true,
+        lastLoginAt: true,
+        _count: {
+          select: {
+            studentBookings: true,
+            tutorBookings: true,
+            reviewsGiven: true
+          }
+        }
+      },
+      orderBy: { createdAt: "desc" },
+      skip,
+      take: limit
+    }),
+    prisma.user.count({ where })
+  ]);
+  return {
+    users,
+    meta: {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit)
+    }
+  };
 };
 var getUserDetails = async (id) => {
   const user = await prisma.user.findUnique({
@@ -2820,10 +2877,102 @@ var deleteReview = async (id) => {
     return deleted;
   });
 };
+var getAllAssignments = async () => {
+  return prisma.assignment.findMany({
+    include: {
+      createdBy: { select: { name: true, email: true } },
+      booking: {
+        include: {
+          student: { select: { name: true, email: true } }
+        }
+      },
+      submissions: {
+        select: { id: true, status: true, grade: true, studentId: true }
+      }
+    },
+    orderBy: { createdAt: "desc" }
+  });
+};
 var deleteAssignment = async (id) => {
   const assignment = await prisma.assignment.findUnique({ where: { id } });
-  if (!assignment) throw new AppError_default(status15.NOT_FOUND, "Assignment entirely missing");
+  if (!assignment) throw new AppError_default(status15.NOT_FOUND, "Assignment not found");
   return prisma.assignment.delete({ where: { id } });
+};
+var updateBookingStatus = async (id, newStatus) => {
+  const booking = await prisma.booking.findUnique({ where: { id } });
+  if (!booking) {
+    throw new AppError_default(status15.NOT_FOUND, "Booking not found");
+  }
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.booking.update({
+      where: { id },
+      data: { status: newStatus },
+      include: {
+        student: { select: { id: true, name: true, email: true } },
+        tutor: { select: { id: true, name: true, email: true } }
+      }
+    });
+    if (newStatus === "CANCELLED" && booking.availabilityId) {
+      await tx.tutorAvailability.update({
+        where: { id: booking.availabilityId },
+        data: { isBooked: false }
+      });
+    }
+    const notificationData = [
+      {
+        userId: booking.studentId,
+        title: "Booking Status Updated",
+        message: `Your booking status has been updated to ${newStatus} by an administrator.`,
+        type: "SYSTEM"
+      },
+      {
+        userId: booking.tutorId,
+        title: "Booking Status Updated",
+        message: `A booking with your student has been updated to ${newStatus} by an administrator.`,
+        type: "SYSTEM"
+      }
+    ];
+    await tx.notification.createMany({ data: notificationData });
+    return updated;
+  });
+};
+var getAllNotifications = async () => {
+  return prisma.notification.findMany({
+    include: {
+      user: { select: { id: true, name: true, email: true, role: true } }
+    },
+    orderBy: { createdAt: "desc" }
+  });
+};
+var deleteNotification = async (id) => {
+  const notification = await prisma.notification.findUnique({ where: { id } });
+  if (!notification) {
+    throw new AppError_default(status15.NOT_FOUND, "Notification not found");
+  }
+  return prisma.notification.delete({ where: { id } });
+};
+var sendBroadcastNotification = async (title, message) => {
+  const allUsers = await prisma.user.findMany({
+    where: { status: "ACTIVE" },
+    select: { id: true }
+  });
+  const data = allUsers.map((u) => ({
+    userId: u.id,
+    title,
+    message,
+    type: "SYSTEM"
+  }));
+  const result = await prisma.notification.createMany({ data });
+  return { sentTo: result.count };
+};
+var sendNotificationToUser = async (userId, title, message) => {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) {
+    throw new AppError_default(status15.NOT_FOUND, "Target user not found");
+  }
+  return prisma.notification.create({
+    data: { userId, title, message, type: "SYSTEM" }
+  });
 };
 var AdminService = {
   getAllUsers,
@@ -2832,6 +2981,7 @@ var AdminService = {
   deleteUser: deleteUser3,
   getAllBookings: getAllBookings2,
   deleteBooking,
+  updateBookingStatus,
   getAllCategories: getAllCategories2,
   createCategory: createCategory2,
   updateCategory,
@@ -2839,14 +2989,26 @@ var AdminService = {
   getAllPayments,
   getAllReviews,
   deleteReview,
-  deleteAssignment
+  getAllAssignments,
+  deleteAssignment,
+  getAllNotifications,
+  deleteNotification,
+  sendBroadcastNotification,
+  sendNotificationToUser
 };
 
 // src/modules/admin/admin.controller.ts
 import status16 from "http-status";
 var AdminController = {
-  getAllUsers: catchAsync_default(async (_req, res) => {
-    const data = await AdminService.getAllUsers();
+  getAllUsers: catchAsync_default(async (req, res) => {
+    const { search, role, status: userStatus, page, limit } = req.query;
+    const query = {};
+    if (search) query.search = search;
+    if (role) query.role = role;
+    if (userStatus) query.status = userStatus;
+    if (page) query.page = parseInt(page);
+    if (limit) query.limit = parseInt(limit);
+    const data = await AdminService.getAllUsers(query);
     sendResponse(res, {
       httpStatusCode: status16.OK,
       success: true,
@@ -3021,12 +3183,100 @@ var AdminController = {
       data
     });
   }),
+  getAllAssignments: catchAsync_default(async (_req, res) => {
+    const data = await AdminService.getAllAssignments();
+    sendResponse(res, {
+      httpStatusCode: status16.OK,
+      success: true,
+      message: "Assignments retrieved successfully",
+      data
+    });
+  }),
   deleteAssignment: catchAsync_default(async (req, res) => {
     const data = await AdminService.deleteAssignment(req.params.id);
     sendResponse(res, {
       httpStatusCode: status16.OK,
       success: true,
-      message: "Assignment strictly terminated from database",
+      message: "Assignment deleted successfully",
+      data
+    });
+  }),
+  // ─── Booking Status Update ────────────────────────────────────────
+  updateBookingStatus: catchAsync_default(async (req, res) => {
+    const { status: bookingStatus } = req.body;
+    const validStatuses = ["PENDING", "CONFIRMED", "COMPLETED", "CANCELLED"];
+    if (!validStatuses.includes(bookingStatus)) {
+      return res.status(status16.BAD_REQUEST).json({
+        success: false,
+        message: `status must be one of: ${validStatuses.join(", ")}`
+      });
+    }
+    const data = await AdminService.updateBookingStatus(
+      req.params.id,
+      bookingStatus
+    );
+    sendResponse(res, {
+      httpStatusCode: status16.OK,
+      success: true,
+      message: `Booking status updated to ${bookingStatus}`,
+      data
+    });
+  }),
+  // ─── Notification Management ──────────────────────────────────────
+  getAllNotifications: catchAsync_default(async (_req, res) => {
+    const data = await AdminService.getAllNotifications();
+    sendResponse(res, {
+      httpStatusCode: status16.OK,
+      success: true,
+      message: "All notifications retrieved successfully",
+      data
+    });
+  }),
+  deleteNotification: catchAsync_default(async (req, res) => {
+    const data = await AdminService.deleteNotification(req.params.id);
+    sendResponse(res, {
+      httpStatusCode: status16.OK,
+      success: true,
+      message: "Notification deleted successfully",
+      data
+    });
+  }),
+  sendBroadcastNotification: catchAsync_default(async (req, res) => {
+    const { title, message } = req.body;
+    if (!title?.trim() || !message?.trim()) {
+      return res.status(status16.BAD_REQUEST).json({
+        success: false,
+        message: "Both title and message are required"
+      });
+    }
+    const data = await AdminService.sendBroadcastNotification(
+      title.trim(),
+      message.trim()
+    );
+    sendResponse(res, {
+      httpStatusCode: status16.CREATED,
+      success: true,
+      message: `Broadcast notification sent to ${data.sentTo} users`,
+      data
+    });
+  }),
+  sendNotificationToUser: catchAsync_default(async (req, res) => {
+    const { userId, title, message } = req.body;
+    if (!userId || !title?.trim() || !message?.trim()) {
+      return res.status(status16.BAD_REQUEST).json({
+        success: false,
+        message: "userId, title, and message are all required"
+      });
+    }
+    const data = await AdminService.sendNotificationToUser(
+      userId,
+      title.trim(),
+      message.trim()
+    );
+    sendResponse(res, {
+      httpStatusCode: status16.CREATED,
+      success: true,
+      message: "Notification sent to user",
       data
     });
   })
@@ -3042,11 +3292,21 @@ router8.patch("/users/:id/status", AdminController.updateUserStatus);
 router8.patch("/users/:id/role", AdminController.updateUserRole);
 router8.delete("/users/:id", AdminController.deleteUser);
 router8.get("/bookings", AdminController.getAllBookings);
+router8.patch("/bookings/:id/status", AdminController.updateBookingStatus);
 router8.delete("/bookings/:id", AdminController.deleteBooking);
 router8.get("/categories", AdminController.getAllCategories);
 router8.post("/categories", AdminController.createCategory);
 router8.patch("/categories/:id", AdminController.updateCategory);
 router8.delete("/categories/:id", AdminController.deleteCategory);
+router8.get("/notifications", AdminController.getAllNotifications);
+router8.delete("/notifications/:id", AdminController.deleteNotification);
+router8.post("/notifications/broadcast", AdminController.sendBroadcastNotification);
+router8.post("/notifications/send-to-user", AdminController.sendNotificationToUser);
+router8.get("/payments", AdminController.getAllPayments);
+router8.get("/reviews", AdminController.getAllReviews);
+router8.delete("/reviews/:id", AdminController.deleteReview);
+router8.get("/assignments", AdminController.getAllAssignments);
+router8.delete("/assignments/:id", AdminController.deleteAssignment);
 var AdminRoutes = router8;
 
 // src/middleware/GlobalErrorHandeler.ts
@@ -5164,6 +5424,84 @@ import Stripe from "stripe";
 var stripe = new Stripe(envVars.STRIPE.STRIPE_SECRET_KEY);
 
 // src/modules/payment/payment.service.ts
+var processSuccessfulPayment = async (internalPaymentId, bookingId, amount) => {
+  const result = await prisma.$transaction(async (tx) => {
+    const payment = await tx.payment.findUnique({
+      where: { id: internalPaymentId },
+      include: {
+        booking: {
+          include: { student: true, tutor: true }
+        }
+      }
+    });
+    if (!payment || payment.status === "SUCCESS") return null;
+    await tx.payment.update({
+      where: { id: internalPaymentId },
+      data: { status: "SUCCESS" }
+    });
+    await tx.booking.update({
+      where: { id: bookingId },
+      data: { paymentStatus: "PAID", status: "CONFIRMED" }
+    });
+    if (payment.booking.tutorProfileId) {
+      await tx.tutorProfile.update({
+        where: { id: payment.booking.tutorProfileId },
+        data: { totalEarnings: { increment: amount } }
+      });
+    }
+    await tx.notification.createMany({
+      data: [
+        {
+          userId: payment.userId,
+          title: "Payment Successful \u2705",
+          message: `Your payment of \u09F3${amount} has been processed successfully. Your session is now fully confirmed!`,
+          type: "PAYMENT"
+        },
+        {
+          userId: payment.booking.tutorId,
+          title: "Student Payment Received",
+          message: `A student has completed payment for their booking. The session is now fully confirmed.`,
+          type: "PAYMENT"
+        }
+      ]
+    });
+    return payment;
+  });
+  if (result && result.booking) {
+    const booking = result.booking;
+    const student = booking.student;
+    const tutor = booking.tutor;
+    const invoiceData = {
+      studentName: student.name,
+      invoiceId: result.id,
+      transactionId: result.transactionId || "N/A",
+      paymentDate: (/* @__PURE__ */ new Date()).toLocaleDateString(),
+      courseName: `1-on-1 Tutoring Session with ${tutor.name}`,
+      enrollmentDate: new Date(booking.createdAt).toLocaleDateString(),
+      amount,
+      invoiceUrl: ""
+      // Optionally add a link if PDF downloads are later implemented
+    };
+    await sendEmail({
+      to: student.email,
+      subject: "Payment Invoice & Session Confirmation - SkillBridge",
+      templateName: "invoice",
+      templateData: invoiceData
+    }).catch(console.error);
+    await sendEmail({
+      to: tutor.email,
+      subject: "New Session Confirmed - SkillBridge",
+      templateName: "invoice",
+      templateData: {
+        ...invoiceData,
+        studentName: tutor.name,
+        // Adjust greeting for tutor
+        courseName: `1-on-1 Tutoring Session booked by ${student.name}`
+      }
+    }).catch(console.error);
+  }
+  return result;
+};
 var createPaymentIntent = async (bookingId, studentId) => {
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
@@ -5250,41 +5588,11 @@ var handleStripeWebhook = async (rawBody, signature) => {
         console.error("Webhook lacked critical identifying booking keys", paymentIntent.id);
         break;
       }
-      await prisma.$transaction(async (tx) => {
-        const payment = await tx.payment.findUnique({
-          where: { id: internalPaymentId },
-          include: { booking: true }
-        });
-        if (!payment || payment.status === "SUCCESS") return;
-        await tx.payment.update({
-          where: { id: internalPaymentId },
-          data: {
-            status: "SUCCESS"
-          }
-        });
-        await tx.booking.update({
-          where: { id: bookingId },
-          data: {
-            paymentStatus: "PAID"
-          }
-        });
-        await tx.tutorProfile.update({
-          where: { id: payment.booking.tutorProfileId },
-          data: {
-            totalEarnings: {
-              increment: payment.amount
-            }
-          }
-        });
-        await tx.notification.create({
-          data: {
-            userId: payment.userId,
-            title: "Payment Processed",
-            message: `Your payment was fully settled structurally matching a secured transactional record.`,
-            type: "PAYMENT"
-          }
-        });
+      const payment = await prisma.payment.findUnique({
+        where: { id: internalPaymentId }
       });
+      if (!payment || payment.status === "SUCCESS") break;
+      await processSuccessfulPayment(internalPaymentId, bookingId, payment.amount);
       break;
     }
     case "payment_intent.payment_failed": {
@@ -5333,10 +5641,77 @@ var getPaymentDetails = async (transactionId, userId, role) => {
   }
   return payment;
 };
+var syncPayment = async (bookingId, studentId) => {
+  const payment = await prisma.payment.findUnique({
+    where: { bookingId },
+    include: { booking: true }
+  });
+  if (!payment) {
+    throw new AppError_default(status26.NOT_FOUND, "No payment record found for this booking.");
+  }
+  if (payment.userId !== studentId) {
+    throw new AppError_default(status26.FORBIDDEN, "Unauthorized sync attempt.");
+  }
+  if (payment.status === "SUCCESS") {
+    return { status: "SUCCESS", message: "Already synced." };
+  }
+  if (!payment.transactionId) {
+    return { status: "INITIATED", message: "No transaction tracked yet." };
+  }
+  const intent = await stripe.paymentIntents.retrieve(payment.transactionId);
+  if (intent.status === "succeeded") {
+    await processSuccessfulPayment(payment.id, bookingId, payment.amount);
+    return { status: "SUCCESS", message: "Successfully synced from Stripe." };
+  }
+  return { status: intent.status, message: "Checked intent state." };
+};
+var getAllPayments2 = async (params) => {
+  const { userId, role, page = 1, limit = 10 } = params;
+  const skip = (page - 1) * limit;
+  let where = {};
+  if (role === "STUDENT") {
+    where = { userId };
+  } else if (role === "TUTOR") {
+    where = {
+      booking: {
+        tutorId: userId
+      }
+    };
+  }
+  const [payments, total] = await Promise.all([
+    prisma.payment.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy: { createdAt: "desc" },
+      include: {
+        booking: {
+          include: {
+            student: { select: { name: true, email: true } },
+            tutor: { select: { id: true, name: true, email: true } },
+            tutorProfile: { select: { id: true, profileImage: true } }
+          }
+        }
+      }
+    }),
+    prisma.payment.count({ where })
+  ]);
+  return {
+    payments,
+    meta: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit)
+    }
+  };
+};
 var PaymentService = {
   createPaymentIntent,
   handleStripeWebhook,
-  getPaymentDetails
+  getPaymentDetails,
+  syncPayment,
+  getAllPayments: getAllPayments2
 };
 
 // src/modules/payment/payment.controller.ts
@@ -5396,11 +5771,51 @@ var PaymentController = {
       message: "Payment detailed successfully fetched",
       data
     });
+  }),
+  syncPayment: catchAsync_default(async (req, res) => {
+    const { bookingId } = req.body;
+    if (!bookingId || typeof bookingId !== "string") {
+      return res.status(status27.BAD_REQUEST).json({
+        success: false,
+        message: "bookingId is required"
+      });
+    }
+    const data = await PaymentService.syncPayment(
+      bookingId.trim(),
+      req.user.userId
+    );
+    sendResponse(res, {
+      httpStatusCode: status27.OK,
+      success: true,
+      message: data.message,
+      data
+    });
+  }),
+  getAllPayments: catchAsync_default(async (req, res) => {
+    const { page, limit } = req.query;
+    const data = await PaymentService.getAllPayments({
+      userId: req.user.userId,
+      role: req.user.role,
+      page: Number(page) || 1,
+      limit: Number(limit) || 10
+    });
+    sendResponse(res, {
+      httpStatusCode: status27.OK,
+      success: true,
+      message: "Payments fetched successfully",
+      data: data.payments,
+      meta: data.meta
+    });
   })
 };
 
 // src/modules/payment/payment.route.ts
 var router12 = Router11();
+router12.get(
+  "/",
+  checkAuth_default("STUDENT" /* STUDENT */, "TUTOR" /* TUTOR */, "ADMIN" /* ADMIN */),
+  PaymentController.getAllPayments
+);
 router12.post(
   "/create-payment-intent",
   checkAuth_default("STUDENT" /* STUDENT */),
@@ -5414,6 +5829,11 @@ router12.get(
   "/:transactionId",
   checkAuth_default("STUDENT" /* STUDENT */, "TUTOR" /* TUTOR */, "ADMIN" /* ADMIN */),
   PaymentController.getPaymentDetails
+);
+router12.post(
+  "/sync",
+  checkAuth_default("STUDENT" /* STUDENT */),
+  PaymentController.syncPayment
 );
 var PaymentRoutes = router12;
 

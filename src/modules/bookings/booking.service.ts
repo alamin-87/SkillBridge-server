@@ -71,7 +71,7 @@ const createBooking = async (studentId: string, payload: CreateBookingPayload) =
           scheduledStart: slot.startTime,
           scheduledEnd: slot.endTime,
           price: slotPackagePrice,
-          status: "CONFIRMED",
+          status: "PENDING",
           notes: thirtyDaysNotes
         },
       });
@@ -80,8 +80,18 @@ const createBooking = async (studentId: string, payload: CreateBookingPayload) =
         data: {
           userId: tutorId,
           title: "New Booking Received",
-          message: `A student explicitly established a 30-day package structurally tying a fixed availability slot.`,
+          message: `A student booked a 30-day package with your availability slot.`,
           type: "BOOKING",
+        },
+      });
+
+      // Notify student about booking creation + payment reminder
+      await tx.notification.create({
+        data: {
+          userId: studentId,
+          title: "Booking Created – Payment Required",
+          message: `Your booking has been created! Please complete payment to confirm your session.`,
+          type: "PAYMENT",
         },
       });
 
@@ -97,7 +107,7 @@ const createBooking = async (studentId: string, payload: CreateBookingPayload) =
         scheduledStart: start,
         scheduledEnd: end,
         price: thirtyDaysPrice,
-        status: "CONFIRMED",
+        status: "PENDING",
         notes: thirtyDaysNotes
       },
     });
@@ -106,8 +116,18 @@ const createBooking = async (studentId: string, payload: CreateBookingPayload) =
       data: {
         userId: tutorId,
         title: "New Booking Received",
-        message: `A student manually established a 30-day package structure outside generic slots.`,
+        message: `A student booked a 30-day package with custom scheduling.`,
         type: "BOOKING",
+      },
+    });
+
+    // Notify student about booking creation + payment reminder
+    await tx.notification.create({
+      data: {
+        userId: studentId,
+        title: "Booking Created – Payment Required",
+        message: `Your booking has been created! Please complete payment to confirm your session.`,
+        type: "PAYMENT",
       },
     });
 

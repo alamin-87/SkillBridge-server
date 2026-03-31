@@ -72,4 +72,45 @@ export const PaymentController = {
       data,
     });
   }),
+
+  syncPayment: catchAsync(async (req: Request, res: Response) => {
+    const { bookingId } = req.body;
+
+    if (!bookingId || typeof bookingId !== "string") {
+      return res.status(status.BAD_REQUEST).json({
+        success: false,
+        message: "bookingId is required",
+      });
+    }
+
+    const data = await PaymentService.syncPayment(
+      bookingId.trim(),
+      req.user!.userId
+    );
+
+    sendResponse(res, {
+      httpStatusCode: status.OK,
+      success: true,
+      message: data.message,
+      data,
+    });
+  }),
+  getAllPayments: catchAsync(async (req: Request, res: Response) => {
+    const { page, limit } = req.query;
+
+    const data = await PaymentService.getAllPayments({
+      userId: req.user!.userId,
+      role: req.user!.role,
+      page: Number(page) || 1,
+      limit: Number(limit) || 10,
+    });
+
+    sendResponse(res, {
+      httpStatusCode: status.OK,
+      success: true,
+      message: "Payments fetched successfully",
+      data: data.payments,
+      meta: data.meta,
+    });
+  }),
 };

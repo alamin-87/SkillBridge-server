@@ -127,8 +127,8 @@ export const auth = betterAuth({
     expiresIn: 24 * 60 * 60, // 1 day
     updateAge: 24 * 60 * 60,
     cookieCache: {
-      enabled: true,
-      maxAge: 24 * 60 * 60,
+      enabled: false,
+      maxAge: 0,
     },
   },
 

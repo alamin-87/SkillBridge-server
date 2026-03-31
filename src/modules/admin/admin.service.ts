@@ -4,18 +4,72 @@ import status from "http-status";
 
 // Note: Removed getDashboardStats since we implemented StatsModule comprehensively.
 
-const getAllUsers = async () => {
-  return prisma.user.findMany({
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      role: true,
-      status: true,
-      createdAt: true,
+const getAllUsers = async (query?: {
+  search?: string;
+  role?: string;
+  status?: string;
+  page?: number;
+  limit?: number;
+}) => {
+  const page = Math.max(1, query?.page ?? 1);
+  const limit = Math.min(100, Math.max(1, query?.limit ?? 50));
+  const skip = (page - 1) * limit;
+
+  // Build dynamic where clause
+  const where: Record<string, unknown> = {};
+
+  if (query?.search) {
+    where.OR = [
+      { name: { contains: query.search, mode: "insensitive" } },
+      { email: { contains: query.search, mode: "insensitive" } },
+    ];
+  }
+
+  if (query?.role && ["STUDENT", "TUTOR", "ADMIN"].includes(query.role)) {
+    where.role = query.role;
+  }
+
+  if (query?.status && ["ACTIVE", "BANNED"].includes(query.status)) {
+    where.status = query.status;
+  }
+
+  const [users, total] = await Promise.all([
+    prisma.user.findMany({
+      where,
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        image: true,
+        role: true,
+        status: true,
+        phone: true,
+        createdAt: true,
+        lastLoginAt: true,
+        _count: {
+          select: {
+            studentBookings: true,
+            tutorBookings: true,
+            reviewsGiven: true,
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+      skip,
+      take: limit,
+    }),
+    prisma.user.count({ where }),
+  ]);
+
+  return {
+    users,
+    meta: {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
     },
-    orderBy: { createdAt: "desc" },
-  });
+  };
 };
 
 const getUserDetails = async (id: string) => {
@@ -228,12 +282,130 @@ const deleteReview = async (id: string) => {
   });
 };
 
-// ─── Assignment Moderation ───────────────────────────────────────────
+// ─── Assignment Management ───────────────────────────────────────────
+const getAllAssignments = async () => {
+  return prisma.assignment.findMany({
+    include: {
+      createdBy: { select: { name: true, email: true } },
+      booking: {
+        include: {
+          student: { select: { name: true, email: true } },
+        },
+      },
+      submissions: {
+        select: { id: true, status: true, grade: true, studentId: true },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+};
+
 const deleteAssignment = async (id: string) => {
   const assignment = await prisma.assignment.findUnique({ where: { id } });
-  if (!assignment) throw new AppError(status.NOT_FOUND, "Assignment entirely missing");
+  if (!assignment) throw new AppError(status.NOT_FOUND, "Assignment not found");
   
   return prisma.assignment.delete({ where: { id } });
+};
+
+// ─── Booking Status Update ──────────────────────────────────────────
+const updateBookingStatus = async (
+  id: string,
+  newStatus: "PENDING" | "CONFIRMED" | "COMPLETED" | "CANCELLED"
+) => {
+  const booking = await prisma.booking.findUnique({ where: { id } });
+  if (!booking) {
+    throw new AppError(status.NOT_FOUND, "Booking not found");
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.booking.update({
+      where: { id },
+      data: { status: newStatus },
+      include: {
+        student: { select: { id: true, name: true, email: true } },
+        tutor: { select: { id: true, name: true, email: true } },
+      },
+    });
+
+    // Release availability if cancelled
+    if (newStatus === "CANCELLED" && booking.availabilityId) {
+      await tx.tutorAvailability.update({
+        where: { id: booking.availabilityId },
+        data: { isBooked: false },
+      });
+    }
+
+    // Notify both student and tutor about the status change
+    const notificationData = [
+      {
+        userId: booking.studentId,
+        title: "Booking Status Updated",
+        message: `Your booking status has been updated to ${newStatus} by an administrator.`,
+        type: "SYSTEM" as const,
+      },
+      {
+        userId: booking.tutorId,
+        title: "Booking Status Updated",
+        message: `A booking with your student has been updated to ${newStatus} by an administrator.`,
+        type: "SYSTEM" as const,
+      },
+    ];
+
+    await tx.notification.createMany({ data: notificationData });
+
+    return updated;
+  });
+};
+
+// ─── Notification Management ────────────────────────────────────────
+const getAllNotifications = async () => {
+  return prisma.notification.findMany({
+    include: {
+      user: { select: { id: true, name: true, email: true, role: true } },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+};
+
+const deleteNotification = async (id: string) => {
+  const notification = await prisma.notification.findUnique({ where: { id } });
+  if (!notification) {
+    throw new AppError(status.NOT_FOUND, "Notification not found");
+  }
+
+  return prisma.notification.delete({ where: { id } });
+};
+
+const sendBroadcastNotification = async (title: string, message: string) => {
+  const allUsers = await prisma.user.findMany({
+    where: { status: "ACTIVE" },
+    select: { id: true },
+  });
+
+  const data = allUsers.map((u) => ({
+    userId: u.id,
+    title,
+    message,
+    type: "SYSTEM" as const,
+  }));
+
+  const result = await prisma.notification.createMany({ data });
+  return { sentTo: result.count };
+};
+
+const sendNotificationToUser = async (
+  userId: string,
+  title: string,
+  message: string
+) => {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) {
+    throw new AppError(status.NOT_FOUND, "Target user not found");
+  }
+
+  return prisma.notification.create({
+    data: { userId, title, message, type: "SYSTEM" },
+  });
 };
 
 export const AdminService = {
@@ -243,6 +415,7 @@ export const AdminService = {
   deleteUser,
   getAllBookings,
   deleteBooking,
+  updateBookingStatus,
   getAllCategories,
   createCategory,
   updateCategory,
@@ -250,5 +423,10 @@ export const AdminService = {
   getAllPayments,
   getAllReviews,
   deleteReview,
-  deleteAssignment
+  getAllAssignments,
+  deleteAssignment,
+  getAllNotifications,
+  deleteNotification,
+  sendBroadcastNotification,
+  sendNotificationToUser,
 };
