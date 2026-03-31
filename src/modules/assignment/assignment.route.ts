@@ -10,6 +10,7 @@ const router = Router();
 router.post(
   "/",
   authMiddleWare(UserRole.TUTOR),
+  multerUpload.array("files", 5),
   AssignmentController.createAssignment
 );
 
@@ -39,6 +40,7 @@ router.post(
 router.patch(
   "/:assignmentId/submissions/:submissionId/evaluate",
   authMiddleWare(UserRole.TUTOR),
+  multerUpload.array("files", 1),
   AssignmentController.evaluateSubmission
 );
 

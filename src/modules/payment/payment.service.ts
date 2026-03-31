@@ -8,6 +8,8 @@ import { sendEmail } from "../../utils/email";
 
 // Helper function to process fully confirmed payments
 const processSuccessfulPayment = async (internalPaymentId: string, bookingId: string, amount: number) => {
+  const meetingLink = `https://meet.jit.si/SkillBridge-${bookingId.slice(-8)}`;
+
   const result = await prisma.$transaction(async (tx) => {
     // 1. Fetch full details including users for emailing
     const payment = await tx.payment.findUnique({
@@ -30,7 +32,11 @@ const processSuccessfulPayment = async (internalPaymentId: string, bookingId: st
     // 3. Mutate parent booking natively signifying full transaction receipt
     await tx.booking.update({
       where: { id: bookingId },
-      data: { paymentStatus: "PAID", status: "CONFIRMED" },
+      data: { 
+        paymentStatus: "PAID", 
+        status: "CONFIRMED",
+        meetingLink: meetingLink // 🔥 Inject instant meeting link
+      },
     });
 
     // 4. Inject the payment success metric up to the Tutor Profile
@@ -47,13 +53,13 @@ const processSuccessfulPayment = async (internalPaymentId: string, bookingId: st
         {
           userId: payment.userId,
           title: "Payment Successful ✅",
-          message: `Your payment of ৳${amount} has been processed successfully. Your session is now fully confirmed!`,
+          message: `Your payment of ৳${amount} has been processed. Your session is now fully confirmed! Meeting: ${meetingLink}`,
           type: "PAYMENT",
         },
         {
           userId: payment.booking.tutorId,
           title: "Student Payment Received",
-          message: `A student has completed payment for their booking. The session is now fully confirmed.`,
+          message: `A student has completed payment. The session is now fully confirmed. Meeting: ${meetingLink}`,
           type: "PAYMENT",
         },
       ],
@@ -76,7 +82,7 @@ const processSuccessfulPayment = async (internalPaymentId: string, bookingId: st
       courseName: `1-on-1 Tutoring Session with ${tutor.name}`,
       enrollmentDate: new Date(booking.createdAt).toLocaleDateString(),
       amount: amount,
-      invoiceUrl: "", // Optionally add a link if PDF downloads are later implemented
+      meetingLink: meetingLink, // 🔥 Send link in email
     };
 
     // Send Invoice to Student
@@ -84,7 +90,10 @@ const processSuccessfulPayment = async (internalPaymentId: string, bookingId: st
       to: student.email,
       subject: "Payment Invoice & Session Confirmation - SkillBridge",
       templateName: "invoice",
-      templateData: invoiceData,
+      templateData: {
+        ...invoiceData,
+        notes: `Your private session is confirmed. Link: ${meetingLink}`
+      },
     }).catch(console.error);
 
     // Send Notification to Tutor
@@ -94,8 +103,9 @@ const processSuccessfulPayment = async (internalPaymentId: string, bookingId: st
       templateName: "invoice",
       templateData: {
         ...invoiceData,
-        studentName: tutor.name, // Adjust greeting for tutor
+        studentName: tutor.name,
         courseName: `1-on-1 Tutoring Session booked by ${student.name}`,
+        notes: `New booking confirmed. Meeting Link: ${meetingLink}`
       },
     }).catch(console.error);
   }

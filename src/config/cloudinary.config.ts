@@ -20,6 +20,7 @@ export const uploadFileToCloudinary = async (
   }
 
   const extension = fileName.split(".").pop()?.toLowerCase();
+  const isPdf = extension === "pdf" || extension === "doc" || extension === "docx";
   const fileNameWithoutExtension = fileName
     .split(".")
     .slice(0, -1)
@@ -35,15 +36,18 @@ export const uploadFileToCloudinary = async (
     "-" +
     fileNameWithoutExtension;
 
-  const folder = extension === "pdf" ? "assignments" : "images";
+  const folder = isPdf ? "assignments" : "images";
+  const resource_type = isPdf ? "image" : "auto";
 
   const result = await new Promise<UploadApiResponse>((resolve, reject) => {
     cloudinary.uploader
       .upload_stream(
         {
-          resource_type: extension === "pdf" ? "raw" : "auto",
+          resource_type: resource_type,
           public_id: uniqueName,
           folder: `${folderPrefix}/${folder}`,
+          type: "upload",
+          access_mode: "public",
         },
         (error, result) => {
           if (error) return reject(error);
@@ -57,7 +61,8 @@ export const uploadFileToCloudinary = async (
 };
 
 export const deleteFileFromCloudinary = async (publicId: string, type: string) => {
-  const resource_type = type === "pdf" ? "raw" : "image";
+  const isDocument = type === "doc" || type === "docx";
+  const resource_type = isDocument ? "raw" : "image"; // PDF is uploaded as image to bypass strict delivery
   await cloudinary.uploader.destroy(publicId, { resource_type });
 };
 

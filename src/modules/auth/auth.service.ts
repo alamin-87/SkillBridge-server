@@ -36,6 +36,15 @@ const registerUser = async (payload: any) => {
       },
     });
 
+    await prisma.notification.create({
+      data: {
+        userId: user.id,
+        title: "Welcome to SkillBridge! 🎉",
+        message: "We're excited to have you here! Explore categories and find the perfect tutor to start your learning journey.",
+        type: "SYSTEM",
+      },
+    }).catch(() => {});
+
     return { user };
   } catch (err) {
     // Clean up Better Auth user if database creation fails
@@ -84,7 +93,22 @@ const loginUser = async (payload: any) => {
       lastLoginAt: new Date(),
       ...(data.user.emailVerified && { emailVerified: true }),
     },
+    include: {
+      tutorProfile: {
+        select: { profileImage: true },
+      },
+    },
   });
+
+  // ✨ Sync image if missing in User but exists in TutorProfile
+  if (!dbUser.image && dbUser.role === "TUTOR" && dbUser.tutorProfile?.profileImage) {
+    dbUser.image = dbUser.tutorProfile.profileImage;
+    // Actually update in DB so it's persistent
+    await prisma.user.update({
+      where: { id: dbUser.id },
+      data: { image: dbUser.tutorProfile.profileImage },
+    });
+  }
 
   // Clean up old sessions except the latest one to prevent conflicts
   // Get all sessions for this user
@@ -112,10 +136,20 @@ const loginUser = async (payload: any) => {
 const getMe = async (userId: string) => {
   const user = await prisma.user.findUnique({
     where: { id: userId },
+    include: {
+      tutorProfile: {
+        select: { profileImage: true },
+      },
+    },
   });
 
   if (!user || user.isDeleted) {
     throw new AppError(status.NOT_FOUND, "User not found");
+  }
+
+  // ✨ Sync image if missing in User but exists in TutorProfile
+  if (!user.image && user.role === "TUTOR" && user.tutorProfile?.profileImage) {
+    user.image = user.tutorProfile.profileImage;
   }
 
   return user;

@@ -2,11 +2,16 @@ import type { Server } from "http";
 import app from "./app";
 import { envVars } from "./config/env";
 import { seedSuperAdmin } from "./scripts/seedAdmin";
+import { SchedulerService } from "./modules/scheduler/scheduler.service";
 
 let server: Server;
 const main = async () => {
   try {
     await seedSuperAdmin();
+
+    // 🔥 Start Background Tasks
+    SchedulerService.startSessionReminderTask();
+
     server = app.listen(envVars.PORT, () => {
       console.log(`server is running on http://localhost:${envVars.PORT}`);
     });

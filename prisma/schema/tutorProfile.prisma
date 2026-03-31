@@ -9,6 +9,7 @@ model TutorProfile {
   location      String?
   languages     String?
   profileImage  String?
+  institution   String?
 
   avgRating    Float @default(0)
   totalReviews Int   @default(0)
@@ -35,7 +36,8 @@ model TutorAvailability {
 
   startTime DateTime
   endTime   DateTime
-  isBooked  Boolean  @default(false)
+  isBooked  Boolean          @default(false)
+  type      AvailabilityType @default(SINGLE)
 
   // ✅ Opposite relation (add this)
   bookings Booking[] // one slot can be linked to many bookings (or 1, depending on your rules)
@@ -57,6 +59,8 @@ model TutorRequest {
   experienceYrs Int
   location      String?
   languages     String?
+  institution   String?
+  categories    String[] @default([])
 
   status          String  @default("PENDING") // PENDING, APPROVED, REJECTED
   rejectionReason String?

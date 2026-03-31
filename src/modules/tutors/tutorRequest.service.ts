@@ -24,6 +24,7 @@ const tutorProfileSelect = {
   totalReviews: true,
   totalEarnings: true,
   isApproved: true,
+  institution: true,
   createdAt: true,
   updatedAt: true,
   categories: {
@@ -140,6 +141,8 @@ const requestToBecomeTutor = async (userId: string, payload: ITutorRequest) => {
       experienceYrs: payload.experienceYrs,
       location: payload.location ?? null,
       languages: payload.languages ?? null,
+      institution: payload.institution ?? null,
+      categories: payload.categories ?? [],
       status: "PENDING",
     },
     select: {
@@ -150,6 +153,8 @@ const requestToBecomeTutor = async (userId: string, payload: ITutorRequest) => {
       experienceYrs: true,
       location: true,
       languages: true,
+      institution: true,
+      categories: true,
       status: true,
       createdAt: true,
       user: {
@@ -157,6 +162,15 @@ const requestToBecomeTutor = async (userId: string, payload: ITutorRequest) => {
       },
     },
   });
+
+  await prisma.notification.create({
+    data: {
+      userId,
+      title: "Tutor Application Received",
+      message: "Your request to join the SkillBridge tutor pool has been successfully submitted and is currently being moderated.",
+      type: "SYSTEM",
+    },
+  }).catch(() => {});
 
   return tutorRequest;
 };
@@ -189,6 +203,7 @@ const approveTutorRequest = async (requestId: string) => {
         experienceYrs: tutorRequest.experienceYrs,
         location: tutorRequest.location ?? null,
         languages: tutorRequest.languages ?? null,
+        institution: tutorRequest.institution ?? null,
         isApproved: true,
       },
       select: tutorProfileSelect,
@@ -205,6 +220,27 @@ const approveTutorRequest = async (requestId: string) => {
       where: { id: requestId },
       data: { status: "APPROVED" },
     });
+
+    // 🏆 New: Map categories from request to profile
+    if (tutorRequest.categories && tutorRequest.categories.length > 0) {
+      const categories = await tx.category.findMany({
+        where: {
+          name: {
+            in: tutorRequest.categories as string[],
+            mode: "insensitive",
+          },
+        },
+      });
+
+      if (categories.length > 0) {
+        await tx.tutorCategory.createMany({
+          data: categories.map((cat) => ({
+            tutorProfileId: tutorProfile.id,
+            categoryId: cat.id,
+          })),
+        });
+      }
+    }
 
     await tx.notification.create({
       data: {
@@ -376,6 +412,8 @@ const updateTutorProfile = async (
   }
 
   const result = await prisma.$transaction(async (tx) => {
+    const finalProfileImage = (profileImageData as any).profileImage || payload.profileImage;
+
     // 1. Update Profile Fields
     await tx.tutorProfile.update({
       where: { userId },
@@ -384,6 +422,14 @@ const updateTutorProfile = async (
         ...profileImageData,
       },
     });
+
+    // 🏆 New: Sync profile image to User model so navbar/dashboard reflects it
+    if (finalProfileImage) {
+      await tx.user.update({
+        where: { id: userId },
+        data: { image: finalProfileImage },
+      });
+    }
 
     // 2. Handle Categories if provided
     if (categoryNames !== undefined) {
@@ -419,6 +465,16 @@ const updateTutorProfile = async (
       select: tutorProfileSelect,
     });
   });
+
+  // 🔥 Notify tutor about profile update
+  await prisma.notification.create({
+    data: {
+      userId,
+      title: "Tutor Profile Synchronized Successfully",
+      message: "Your professional bio, rates, and category expertise have been updated for all students.",
+      type: "SYSTEM",
+    },
+  }).catch(() => {});
 
   return result;
 };

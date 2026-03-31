@@ -52,3 +52,8 @@ enum AssignmentStatus {
   SUBMITTED
   GRADED
 }
+
+enum AvailabilityType {
+  SINGLE
+  PACKAGE_30D
+}

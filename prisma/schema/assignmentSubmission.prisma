@@ -13,7 +13,8 @@ model AssignmentSubmission {
   gradedBy   User?            @relation("GradedAssignments", fields: [gradedById], references: [id])
   gradedById String?
 
-  feedback String?
+  evaluationReport Json? // 🔥 PDF Report from Tutor
+  feedback         String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

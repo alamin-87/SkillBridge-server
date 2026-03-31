@@ -13,6 +13,8 @@ export const createTutorValidation = z.object({
       location: z.string().optional(),
       languages: z.string().optional(),
       profileImage: z.string().url("Invalid URL").optional(),
+      institution: z.string().optional(),
+      categories: z.array(z.string()).optional(),
     }),
   }),
 });
@@ -25,6 +27,8 @@ export const createTutorRequestValidation = z.object({
     experienceYrs: z.number().int().nonnegative("Experience years must be non-negative"),
     location: z.string().optional(),
     languages: z.string().optional(),
+    institution: z.string().optional(),
+    categories: z.array(z.string()).optional(),
   }),
 });
 
@@ -37,6 +41,7 @@ export const updateTutorValidation = z.object({
     location: z.string().optional(),
     languages: z.string().optional(),
     profileImage: z.string().nullable().optional(),
+    institution: z.string().optional(),
     categories: z.array(z.string()).optional(),
   }),
 });

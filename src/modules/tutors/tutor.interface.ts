@@ -5,6 +5,8 @@ export interface ITutorData {
   location?: string;
   languages?: string;
   profileImage?: string;
+  institution?: string;
+  categories?: string[];
 }
 
 export interface ICreateTutorPayload {
@@ -20,6 +22,8 @@ export interface ITutorRequest {
   experienceYrs: number;
   location?: string;
   languages?: string;
+  institution?: string;
+  categories?: string[];
 }
 
 export interface IUpdateTutor {
@@ -29,6 +33,7 @@ export interface IUpdateTutor {
   location?: string;
   languages?: string;
   profileImage?: string;
+  institution?: string;
   categories?: string[];
 }
 

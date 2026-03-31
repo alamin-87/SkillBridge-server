@@ -7,6 +7,7 @@ import status from "http-status";
 export const AssignmentController = {
   createAssignment: catchAsync(async (req: Request, res: Response) => {
     const { title, description, bookingId } = req.body;
+    const files = req.files as Express.Multer.File[];
 
     if (!title || typeof title !== "string") {
       return res.status(status.BAD_REQUEST).json({
@@ -19,7 +20,8 @@ export const AssignmentController = {
       req.user!.userId,
       title,
       description,
-      bookingId
+      bookingId,
+      files
     );
 
     sendResponse(res, {
@@ -90,8 +92,13 @@ export const AssignmentController = {
     const assignmentId = req.params.assignmentId as string;
     const submissionId = req.params.submissionId as string;
     const { grade, feedback } = req.body;
+    
+    // Support file report from tutor
+    const files = req.files as Express.Multer.File[];
+    const reportFile = files && files.length > 0 ? files[0] : undefined;
 
-    if (grade === undefined || typeof grade !== "number") {
+    const parsedGrade = Number(grade);
+    if (isNaN(parsedGrade)) {
       return res.status(status.BAD_REQUEST).json({
         success: false,
         message: "grade must be a valid number",
@@ -102,8 +109,9 @@ export const AssignmentController = {
       assignmentId,
       submissionId,
       req.user!.userId,
-      grade,
-      feedback
+      parsedGrade,
+      feedback,
+      reportFile
     );
 
     sendResponse(res, {

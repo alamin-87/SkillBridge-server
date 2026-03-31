@@ -2,6 +2,7 @@ model Assignment {
   id          String           @id @default(cuid())
   title       String
   description String?
+  files       Json?            // 🔥 Tutor-provided reference PDFs/files
   status      AssignmentStatus @default(PENDING)
 
   // Student who created/submitted the assignment

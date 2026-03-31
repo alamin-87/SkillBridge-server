@@ -42,14 +42,14 @@ var config = {
   "clientVersion": "7.3.0",
   "engineVersion": "9d6ad21cbbceab97458517b147a6a09ff43aa735",
   "activeProvider": "postgresql",
-  "inlineSchema": 'model ActivityLog {\n  id String @id @default(cuid())\n\n  userId   String?\n  action   String\n  entity   String\n  entityId String?\n\n  metadata Json?\n\n  createdAt DateTime @default(now())\n\n  @@index([userId])\n  @@index([entity])\n}\n\nmodel Admin {\n  id String @id @default(uuid())\n\n  name     String\n  email    String  @unique\n  username String? @unique // \u{1F525} optional login alternative\n\n  profilePhoto  String?\n  contactNumber String?\n\n  isDeleted Boolean   @default(false)\n  deletedAt DateTime?\n\n  isActive    Boolean   @default(true) // \u{1F525} account status\n  lastLoginAt DateTime? // \u{1F525} activity tracking\n\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n\n  // \u{1F539} Relation\n  userId String @unique\n  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)\n\n  // \u{1F539} Audit (optional but powerful)\n  createdBy String?\n  updatedBy String?\n\n  // \u{1F539} Indexing\n  @@index([email])\n  @@index([isDeleted])\n  @@index([isActive])\n  @@index([createdAt])\n  @@map("admins")\n}\n\nmodel Assignment {\n  id          String           @id @default(cuid())\n  title       String\n  description String?\n  status      AssignmentStatus @default(PENDING)\n\n  // Student who created/submitted the assignment\n  submissions AssignmentSubmission[]\n  createdBy   User                   @relation(fields: [createdById], references: [id], onDelete: Cascade)\n  createdById String\n\n  // Optional linked booking (if assignment is tied to a tutoring session)\n  booking   Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)\n  bookingId String?\n\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n\n  @@index([createdById])\n  @@index([status])\n}\n\nmodel AssignmentSubmission {\n  id           String     @id @default(cuid())\n  assignment   Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)\n  assignmentId String\n\n  student   User   @relation("StudentSubmissions", fields: [studentId], references: [id], onDelete: Cascade)\n  studentId String\n\n  files Json // Array of {url, publicId, type}\n\n  status     AssignmentStatus @default(PENDING)\n  grade      Float?\n  gradedBy   User?            @relation("GradedAssignments", fields: [gradedById], references: [id])\n  gradedById String?\n\n  feedback String?\n\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n\n  @@index([studentId])\n  @@index([assignmentId])\n}\n\nmodel User {\n  id            String  @id\n  name          String\n  email         String\n  emailVerified Boolean @default(false)\n  image         String?\n\n  role   UserRole   @default(STUDENT)\n  phone  String?    @unique\n  status UserStatus @default(ACTIVE)\n  // tutorStatus TutorStatus @default(NONE)\n\n  // \u{1F525} NEW\n  lastLoginAt DateTime?\n  isDeleted   Boolean   @default(false)\n  deletedAt   DateTime?\n\n  createdAt         DateTime               @default(now())\n  updatedAt         DateTime               @updatedAt\n  submissions       AssignmentSubmission[] @relation("StudentSubmissions")\n  gradedAssignments AssignmentSubmission[] @relation("GradedAssignments")\n\n  sessions Session[]\n  accounts Account[]\n\n  tutorProfile    TutorProfile?\n  tutorRequests   TutorRequest[] @relation("tutorRequests")\n  admin           Admin?\n  studentBookings Booking[]      @relation("StudentBookings")\n  tutorBookings   Booking[]      @relation("TutorBookings")\n  reviewsGiven    Review[]       @relation("StudentReviews")\n  reviewsReceived Review[]       @relation("TutorReviews")\n\n  notifications Notification[]\n  payments      Payment[]\n  assignments   Assignment[]\n\n  @@unique([email])\n  @@index([role])\n  @@index([status])\n  @@map("user")\n}\n\nmodel Session {\n  id        String   @id\n  expiresAt DateTime\n  token     String\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n  ipAddress String?\n  userAgent String?\n  userId    String\n  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)\n\n  @@unique([token])\n  @@index([userId])\n  @@map("session")\n}\n\nmodel Account {\n  id                    String    @id\n  accountId             String\n  providerId            String\n  userId                String\n  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)\n  accessToken           String?\n  refreshToken          String?\n  idToken               String?\n  accessTokenExpiresAt  DateTime?\n  refreshTokenExpiresAt DateTime?\n  scope                 String?\n  password              String?\n  createdAt             DateTime  @default(now())\n  updatedAt             DateTime  @updatedAt\n\n  @@index([userId])\n  @@map("account")\n}\n\nmodel Verification {\n  id         String   @id\n  identifier String\n  value      String\n  expiresAt  DateTime\n  createdAt  DateTime @default(now())\n  updatedAt  DateTime @updatedAt\n\n  @@index([identifier])\n  @@map("verification")\n}\n\nmodel Booking {\n  id String @id @default(cuid())\n\n  student   User   @relation("StudentBookings", fields: [studentId], references: [id], onDelete: Cascade)\n  studentId String\n\n  tutor   User   @relation("TutorBookings", fields: [tutorId], references: [id], onDelete: Cascade)\n  tutorId String\n\n  tutorProfile   TutorProfile @relation(fields: [tutorProfileId], references: [id], onDelete: Cascade)\n  tutorProfileId String\n\n  availability   TutorAvailability? @relation(fields: [availabilityId], references: [id], onDelete: SetNull)\n  availabilityId String?\n\n  scheduledStart DateTime\n  scheduledEnd   DateTime\n\n  price Float\n\n  // \u{1F525} UPGRADE\n  status        BookingStatus\n  paymentStatus PaymentStatus @default(UNPAID)\n\n  meetingLink String?\n  notes       String?\n\n  cancelledById String?\n  cancelReason  String?\n\n  review      Review?\n  payment     Payment?\n  assignments Assignment[] // Link assignments created during this booking\n\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n\n  @@index([studentId])\n  @@index([tutorId])\n  @@index([status])\n  @@index([scheduledStart])\n}\n\nmodel Category {\n  id   String @id @default(cuid())\n  name String @unique\n\n  // many-to-many with tutor profiles via join table\n  tutorLinks TutorCategory[]\n\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n}\n\nenum UserRole {\n  STUDENT\n  TUTOR\n  ADMIN\n}\n\nenum UserStatus {\n  ACTIVE\n  BANNED\n  SUSPENDED\n}\n\nenum TutorStatus {\n  NONE\n  PENDING\n  APPROVED\n  REJECTED\n}\n\nenum PaymentProvider {\n  STRIPE\n}\n\nenum PaymentTransactionStatus {\n  INITIATED\n  SUCCESS\n  FAILED\n  REFUNDED\n}\n\nenum NotificationType {\n  BOOKING\n  PAYMENT\n  SYSTEM\n}\n\nenum BookingStatus {\n  PENDING\n  CONFIRMED\n  COMPLETED\n  CANCELLED\n}\n\nenum PaymentStatus {\n  UNPAID\n  PAID\n  REFUNDED\n}\n\nenum AssignmentStatus {\n  PENDING\n  SUBMITTED\n  GRADED\n}\n\nmodel Notification {\n  id String @id @default(cuid())\n\n  userId String\n  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)\n\n  title   String\n  message String\n  type    NotificationType\n\n  isRead Boolean @default(false)\n\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n\n  @@index([userId])\n  @@index([isRead])\n}\n\nmodel Payment {\n  id String @id @default(cuid())\n\n  userId String\n  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)\n\n  bookingId String  @unique\n  booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)\n\n  amount   Float\n  provider PaymentProvider\n  status   PaymentTransactionStatus\n\n  transactionId String?\n  paymentUrl    String?\n\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n\n  @@index([userId])\n  @@index([status])\n}\n\nmodel Review {\n  id String @id @default(cuid())\n\n  booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)\n  bookingId String  @unique\n\n  student   User   @relation("StudentReviews", fields: [studentId], references: [id], onDelete: Cascade)\n  studentId String\n\n  tutor   User   @relation("TutorReviews", fields: [tutorId], references: [id], onDelete: Cascade)\n  tutorId String\n\n  rating  Int\n  comment String?\n\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n\n  @@index([tutorId])\n  @@index([rating])\n}\n\n// This is your Prisma schema file,\n// learn more about it in the docs: https://pris.ly/d/prisma-schema\n\n// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?\n// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init\n\ngenerator client {\n  provider = "prisma-client"\n  output   = "../../generated/prisma"\n}\n\ndatasource db {\n  provider = "postgresql"\n}\n\nmodel TutorProfile {\n  id     String @id @default(cuid())\n  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)\n  userId String @unique\n\n  bio           String\n  hourlyRate    Float   @default(0)\n  experienceYrs Int     @default(0)\n  location      String?\n  languages     String?\n  profileImage  String?\n\n  avgRating    Float @default(0)\n  totalReviews Int   @default(0)\n\n  // \u{1F525} NEW\n  totalEarnings Float   @default(0)\n  isApproved    Boolean @default(false)\n\n  categories   TutorCategory[]\n  availability TutorAvailability[]\n  bookings     Booking[]\n\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n\n  @@index([hourlyRate])\n  @@index([avgRating])\n}\n\nmodel TutorAvailability {\n  id             String       @id @default(cuid())\n  tutorProfile   TutorProfile @relation(fields: [tutorProfileId], references: [id], onDelete: Cascade)\n  tutorProfileId String\n\n  startTime DateTime\n  endTime   DateTime\n  isBooked  Boolean  @default(false)\n\n  // \u2705 Opposite relation (add this)\n  bookings Booking[] // one slot can be linked to many bookings (or 1, depending on your rules)\n\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n\n  @@index([tutorProfileId])\n  @@index([startTime, endTime])\n}\n\nmodel TutorRequest {\n  id     String @id @default(cuid())\n  user   User   @relation("tutorRequests", fields: [userId], references: [id], onDelete: Cascade)\n  userId String\n\n  bio           String\n  hourlyRate    Float\n  experienceYrs Int\n  location      String?\n  languages     String?\n\n  status          String  @default("PENDING") // PENDING, APPROVED, REJECTED\n  rejectionReason String?\n\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n\n  @@index([userId])\n  @@index([status])\n}\n\nmodel TutorCategory {\n  id             String       @id @default(cuid())\n  tutorProfile   TutorProfile @relation(fields: [tutorProfileId], references: [id], onDelete: Cascade)\n  tutorProfileId String\n  category       Category     @relation(fields: [categoryId], references: [id], onDelete: Cascade)\n  categoryId     String\n\n  @@unique([tutorProfileId, categoryId])\n  @@index([categoryId])\n}\n',
+  "inlineSchema": 'model ActivityLog {\n  id String @id @default(cuid())\n\n  userId   String?\n  action   String\n  entity   String\n  entityId String?\n\n  metadata Json?\n\n  createdAt DateTime @default(now())\n\n  @@index([userId])\n  @@index([entity])\n}\n\nmodel Admin {\n  id String @id @default(uuid())\n\n  name     String\n  email    String  @unique\n  username String? @unique // \u{1F525} optional login alternative\n\n  profilePhoto  String?\n  contactNumber String?\n\n  isDeleted Boolean   @default(false)\n  deletedAt DateTime?\n\n  isActive    Boolean   @default(true) // \u{1F525} account status\n  lastLoginAt DateTime? // \u{1F525} activity tracking\n\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n\n  // \u{1F539} Relation\n  userId String @unique\n  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)\n\n  // \u{1F539} Audit (optional but powerful)\n  createdBy String?\n  updatedBy String?\n\n  // \u{1F539} Indexing\n  @@index([email])\n  @@index([isDeleted])\n  @@index([isActive])\n  @@index([createdAt])\n  @@map("admins")\n}\n\nmodel Assignment {\n  id          String           @id @default(cuid())\n  title       String\n  description String?\n  files       Json? // \u{1F525} Tutor-provided reference PDFs/files\n  status      AssignmentStatus @default(PENDING)\n\n  // Student who created/submitted the assignment\n  submissions AssignmentSubmission[]\n  createdBy   User                   @relation(fields: [createdById], references: [id], onDelete: Cascade)\n  createdById String\n\n  // Optional linked booking (if assignment is tied to a tutoring session)\n  booking   Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)\n  bookingId String?\n\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n\n  @@index([createdById])\n  @@index([status])\n}\n\nmodel AssignmentSubmission {\n  id           String     @id @default(cuid())\n  assignment   Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)\n  assignmentId String\n\n  student   User   @relation("StudentSubmissions", fields: [studentId], references: [id], onDelete: Cascade)\n  studentId String\n\n  files Json // Array of {url, publicId, type}\n\n  status     AssignmentStatus @default(PENDING)\n  grade      Float?\n  gradedBy   User?            @relation("GradedAssignments", fields: [gradedById], references: [id])\n  gradedById String?\n\n  evaluationReport Json? // \u{1F525} PDF Report from Tutor\n  feedback         String?\n\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n\n  @@index([studentId])\n  @@index([assignmentId])\n}\n\nmodel User {\n  id            String  @id\n  name          String\n  email         String\n  emailVerified Boolean @default(false)\n  image         String?\n\n  role   UserRole   @default(STUDENT)\n  phone  String?    @unique\n  status UserStatus @default(ACTIVE)\n  // tutorStatus TutorStatus @default(NONE)\n\n  // \u{1F525} NEW\n  lastLoginAt DateTime?\n  isDeleted   Boolean   @default(false)\n  deletedAt   DateTime?\n\n  createdAt         DateTime               @default(now())\n  updatedAt         DateTime               @updatedAt\n  submissions       AssignmentSubmission[] @relation("StudentSubmissions")\n  gradedAssignments AssignmentSubmission[] @relation("GradedAssignments")\n\n  sessions Session[]\n  accounts Account[]\n\n  tutorProfile    TutorProfile?\n  tutorRequests   TutorRequest[] @relation("tutorRequests")\n  admin           Admin?\n  studentBookings Booking[]      @relation("StudentBookings")\n  tutorBookings   Booking[]      @relation("TutorBookings")\n  reviewsGiven    Review[]       @relation("StudentReviews")\n  reviewsReceived Review[]       @relation("TutorReviews")\n\n  notifications Notification[]\n  payments      Payment[]\n  assignments   Assignment[]\n\n  @@unique([email])\n  @@index([role])\n  @@index([status])\n  @@map("user")\n}\n\nmodel Session {\n  id        String   @id\n  expiresAt DateTime\n  token     String\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n  ipAddress String?\n  userAgent String?\n  userId    String\n  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)\n\n  @@unique([token])\n  @@index([userId])\n  @@map("session")\n}\n\nmodel Account {\n  id                    String    @id\n  accountId             String\n  providerId            String\n  userId                String\n  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)\n  accessToken           String?\n  refreshToken          String?\n  idToken               String?\n  accessTokenExpiresAt  DateTime?\n  refreshTokenExpiresAt DateTime?\n  scope                 String?\n  password              String?\n  createdAt             DateTime  @default(now())\n  updatedAt             DateTime  @updatedAt\n\n  @@index([userId])\n  @@map("account")\n}\n\nmodel Verification {\n  id         String   @id\n  identifier String\n  value      String\n  expiresAt  DateTime\n  createdAt  DateTime @default(now())\n  updatedAt  DateTime @updatedAt\n\n  @@index([identifier])\n  @@map("verification")\n}\n\nmodel Booking {\n  id String @id @default(cuid())\n\n  student   User   @relation("StudentBookings", fields: [studentId], references: [id], onDelete: Cascade)\n  studentId String\n\n  tutor   User   @relation("TutorBookings", fields: [tutorId], references: [id], onDelete: Cascade)\n  tutorId String\n\n  tutorProfile   TutorProfile @relation(fields: [tutorProfileId], references: [id], onDelete: Cascade)\n  tutorProfileId String\n\n  availability   TutorAvailability? @relation(fields: [availabilityId], references: [id], onDelete: SetNull)\n  availabilityId String?\n\n  scheduledStart DateTime\n  scheduledEnd   DateTime\n\n  price Float\n\n  // \u{1F525} UPGRADE\n  status        BookingStatus\n  paymentStatus PaymentStatus @default(UNPAID)\n\n  meetingLink String?\n  notes       String?\n\n  cancelledById String?\n  cancelReason  String?\n\n  review      Review?\n  payment     Payment?\n  assignments Assignment[] // Link assignments created during this booking\n\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n\n  @@index([studentId])\n  @@index([tutorId])\n  @@index([status])\n  @@index([scheduledStart])\n}\n\nmodel Category {\n  id   String @id @default(cuid())\n  name String @unique\n\n  // many-to-many with tutor profiles via join table\n  tutorLinks TutorCategory[]\n\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n}\n\nenum UserRole {\n  STUDENT\n  TUTOR\n  ADMIN\n}\n\nenum UserStatus {\n  ACTIVE\n  BANNED\n  SUSPENDED\n}\n\nenum TutorStatus {\n  NONE\n  PENDING\n  APPROVED\n  REJECTED\n}\n\nenum PaymentProvider {\n  STRIPE\n}\n\nenum PaymentTransactionStatus {\n  INITIATED\n  SUCCESS\n  FAILED\n  REFUNDED\n}\n\nenum NotificationType {\n  BOOKING\n  PAYMENT\n  SYSTEM\n}\n\nenum BookingStatus {\n  PENDING\n  CONFIRMED\n  COMPLETED\n  CANCELLED\n}\n\nenum PaymentStatus {\n  UNPAID\n  PAID\n  REFUNDED\n}\n\nenum AssignmentStatus {\n  PENDING\n  SUBMITTED\n  GRADED\n}\n\nenum AvailabilityType {\n  SINGLE\n  PACKAGE_30D\n}\n\nmodel Notification {\n  id String @id @default(cuid())\n\n  userId String\n  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)\n\n  title   String\n  message String\n  type    NotificationType\n\n  isRead Boolean @default(false)\n\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n\n  @@index([userId])\n  @@index([isRead])\n}\n\nmodel Payment {\n  id String @id @default(cuid())\n\n  userId String\n  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)\n\n  bookingId String  @unique\n  booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)\n\n  amount   Float\n  provider PaymentProvider\n  status   PaymentTransactionStatus\n\n  transactionId String?\n  paymentUrl    String?\n\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n\n  @@index([userId])\n  @@index([status])\n}\n\nmodel Review {\n  id String @id @default(cuid())\n\n  booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)\n  bookingId String  @unique\n\n  student   User   @relation("StudentReviews", fields: [studentId], references: [id], onDelete: Cascade)\n  studentId String\n\n  tutor   User   @relation("TutorReviews", fields: [tutorId], references: [id], onDelete: Cascade)\n  tutorId String\n\n  rating  Int\n  comment String?\n\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n\n  @@index([tutorId])\n  @@index([rating])\n}\n\n// This is your Prisma schema file,\n// learn more about it in the docs: https://pris.ly/d/prisma-schema\n\n// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?\n// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init\n\ngenerator client {\n  provider = "prisma-client"\n  output   = "../../generated/prisma"\n}\n\ndatasource db {\n  provider = "postgresql"\n}\n\nmodel TutorProfile {\n  id     String @id @default(cuid())\n  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)\n  userId String @unique\n\n  bio           String\n  hourlyRate    Float   @default(0)\n  experienceYrs Int     @default(0)\n  location      String?\n  languages     String?\n  profileImage  String?\n  institution   String?\n\n  avgRating    Float @default(0)\n  totalReviews Int   @default(0)\n\n  // \u{1F525} NEW\n  totalEarnings Float   @default(0)\n  isApproved    Boolean @default(false)\n\n  categories   TutorCategory[]\n  availability TutorAvailability[]\n  bookings     Booking[]\n\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n\n  @@index([hourlyRate])\n  @@index([avgRating])\n}\n\nmodel TutorAvailability {\n  id             String       @id @default(cuid())\n  tutorProfile   TutorProfile @relation(fields: [tutorProfileId], references: [id], onDelete: Cascade)\n  tutorProfileId String\n\n  startTime DateTime\n  endTime   DateTime\n  isBooked  Boolean          @default(false)\n  type      AvailabilityType @default(SINGLE)\n\n  // \u2705 Opposite relation (add this)\n  bookings Booking[] // one slot can be linked to many bookings (or 1, depending on your rules)\n\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n\n  @@index([tutorProfileId])\n  @@index([startTime, endTime])\n}\n\nmodel TutorRequest {\n  id     String @id @default(cuid())\n  user   User   @relation("tutorRequests", fields: [userId], references: [id], onDelete: Cascade)\n  userId String\n\n  bio           String\n  hourlyRate    Float\n  experienceYrs Int\n  location      String?\n  languages     String?\n  institution   String?\n  categories    String[] @default([])\n\n  status          String  @default("PENDING") // PENDING, APPROVED, REJECTED\n  rejectionReason String?\n\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n\n  @@index([userId])\n  @@index([status])\n}\n\nmodel TutorCategory {\n  id             String       @id @default(cuid())\n  tutorProfile   TutorProfile @relation(fields: [tutorProfileId], references: [id], onDelete: Cascade)\n  tutorProfileId String\n  category       Category     @relation(fields: [categoryId], references: [id], onDelete: Cascade)\n  categoryId     String\n\n  @@unique([tutorProfileId, categoryId])\n  @@index([categoryId])\n}\n',
   "runtimeDataModel": {
     "models": {},
     "enums": {},
     "types": {}
   }
 };
-config.runtimeDataModel = JSON.parse('{"models":{"ActivityLog":{"fields":[{"name":"id","kind":"scalar","type":"String"},{"name":"userId","kind":"scalar","type":"String"},{"name":"action","kind":"scalar","type":"String"},{"name":"entity","kind":"scalar","type":"String"},{"name":"entityId","kind":"scalar","type":"String"},{"name":"metadata","kind":"scalar","type":"Json"},{"name":"createdAt","kind":"scalar","type":"DateTime"}],"dbName":null},"Admin":{"fields":[{"name":"id","kind":"scalar","type":"String"},{"name":"name","kind":"scalar","type":"String"},{"name":"email","kind":"scalar","type":"String"},{"name":"username","kind":"scalar","type":"String"},{"name":"profilePhoto","kind":"scalar","type":"String"},{"name":"contactNumber","kind":"scalar","type":"String"},{"name":"isDeleted","kind":"scalar","type":"Boolean"},{"name":"deletedAt","kind":"scalar","type":"DateTime"},{"name":"isActive","kind":"scalar","type":"Boolean"},{"name":"lastLoginAt","kind":"scalar","type":"DateTime"},{"name":"createdAt","kind":"scalar","type":"DateTime"},{"name":"updatedAt","kind":"scalar","type":"DateTime"},{"name":"userId","kind":"scalar","type":"String"},{"name":"user","kind":"object","type":"User","relationName":"AdminToUser"},{"name":"createdBy","kind":"scalar","type":"String"},{"name":"updatedBy","kind":"scalar","type":"String"}],"dbName":"admins"},"Assignment":{"fields":[{"name":"id","kind":"scalar","type":"String"},{"name":"title","kind":"scalar","type":"String"},{"name":"description","kind":"scalar","type":"String"},{"name":"status","kind":"enum","type":"AssignmentStatus"},{"name":"submissions","kind":"object","type":"AssignmentSubmission","relationName":"AssignmentToAssignmentSubmission"},{"name":"createdBy","kind":"object","type":"User","relationName":"AssignmentToUser"},{"name":"createdById","kind":"scalar","type":"String"},{"name":"booking","kind":"object","type":"Booking","relationName":"AssignmentToBooking"},{"name":"bookingId","kind":"scalar","type":"String"},{"name":"createdAt","kind":"scalar","type":"DateTime"},{"name":"updatedAt","kind":"scalar","type":"DateTime"}],"dbName":null},"AssignmentSubmission":{"fields":[{"name":"id","kind":"scalar","type":"String"},{"name":"assignment","kind":"object","type":"Assignment","relationName":"AssignmentToAssignmentSubmission"},{"name":"assignmentId","kind":"scalar","type":"String"},{"name":"student","kind":"object","type":"User","relationName":"StudentSubmissions"},{"name":"studentId","kind":"scalar","type":"String"},{"name":"files","kind":"scalar","type":"Json"},{"name":"status","kind":"enum","type":"AssignmentStatus"},{"name":"grade","kind":"scalar","type":"Float"},{"name":"gradedBy","kind":"object","type":"User","relationName":"GradedAssignments"},{"name":"gradedById","kind":"scalar","type":"String"},{"name":"feedback","kind":"scalar","type":"String"},{"name":"createdAt","kind":"scalar","type":"DateTime"},{"name":"updatedAt","kind":"scalar","type":"DateTime"}],"dbName":null},"User":{"fields":[{"name":"id","kind":"scalar","type":"String"},{"name":"name","kind":"scalar","type":"String"},{"name":"email","kind":"scalar","type":"String"},{"name":"emailVerified","kind":"scalar","type":"Boolean"},{"name":"image","kind":"scalar","type":"String"},{"name":"role","kind":"enum","type":"UserRole"},{"name":"phone","kind":"scalar","type":"String"},{"name":"status","kind":"enum","type":"UserStatus"},{"name":"lastLoginAt","kind":"scalar","type":"DateTime"},{"name":"isDeleted","kind":"scalar","type":"Boolean"},{"name":"deletedAt","kind":"scalar","type":"DateTime"},{"name":"createdAt","kind":"scalar","type":"DateTime"},{"name":"updatedAt","kind":"scalar","type":"DateTime"},{"name":"submissions","kind":"object","type":"AssignmentSubmission","relationName":"StudentSubmissions"},{"name":"gradedAssignments","kind":"object","type":"AssignmentSubmission","relationName":"GradedAssignments"},{"name":"sessions","kind":"object","type":"Session","relationName":"SessionToUser"},{"name":"accounts","kind":"object","type":"Account","relationName":"AccountToUser"},{"name":"tutorProfile","kind":"object","type":"TutorProfile","relationName":"TutorProfileToUser"},{"name":"tutorRequests","kind":"object","type":"TutorRequest","relationName":"tutorRequests"},{"name":"admin","kind":"object","type":"Admin","relationName":"AdminToUser"},{"name":"studentBookings","kind":"object","type":"Booking","relationName":"StudentBookings"},{"name":"tutorBookings","kind":"object","type":"Booking","relationName":"TutorBookings"},{"name":"reviewsGiven","kind":"object","type":"Review","relationName":"StudentReviews"},{"name":"reviewsReceived","kind":"object","type":"Review","relationName":"TutorReviews"},{"name":"notifications","kind":"object","type":"Notification","relationName":"NotificationToUser"},{"name":"payments","kind":"object","type":"Payment","relationName":"PaymentToUser"},{"name":"assignments","kind":"object","type":"Assignment","relationName":"AssignmentToUser"}],"dbName":"user"},"Session":{"fields":[{"name":"id","kind":"scalar","type":"String"},{"name":"expiresAt","kind":"scalar","type":"DateTime"},{"name":"token","kind":"scalar","type":"String"},{"name":"createdAt","kind":"scalar","type":"DateTime"},{"name":"updatedAt","kind":"scalar","type":"DateTime"},{"name":"ipAddress","kind":"scalar","type":"String"},{"name":"userAgent","kind":"scalar","type":"String"},{"name":"userId","kind":"scalar","type":"String"},{"name":"user","kind":"object","type":"User","relationName":"SessionToUser"}],"dbName":"session"},"Account":{"fields":[{"name":"id","kind":"scalar","type":"String"},{"name":"accountId","kind":"scalar","type":"String"},{"name":"providerId","kind":"scalar","type":"String"},{"name":"userId","kind":"scalar","type":"String"},{"name":"user","kind":"object","type":"User","relationName":"AccountToUser"},{"name":"accessToken","kind":"scalar","type":"String"},{"name":"refreshToken","kind":"scalar","type":"String"},{"name":"idToken","kind":"scalar","type":"String"},{"name":"accessTokenExpiresAt","kind":"scalar","type":"DateTime"},{"name":"refreshTokenExpiresAt","kind":"scalar","type":"DateTime"},{"name":"scope","kind":"scalar","type":"String"},{"name":"password","kind":"scalar","type":"String"},{"name":"createdAt","kind":"scalar","type":"DateTime"},{"name":"updatedAt","kind":"scalar","type":"DateTime"}],"dbName":"account"},"Verification":{"fields":[{"name":"id","kind":"scalar","type":"String"},{"name":"identifier","kind":"scalar","type":"String"},{"name":"value","kind":"scalar","type":"String"},{"name":"expiresAt","kind":"scalar","type":"DateTime"},{"name":"createdAt","kind":"scalar","type":"DateTime"},{"name":"updatedAt","kind":"scalar","type":"DateTime"}],"dbName":"verification"},"Booking":{"fields":[{"name":"id","kind":"scalar","type":"String"},{"name":"student","kind":"object","type":"User","relationName":"StudentBookings"},{"name":"studentId","kind":"scalar","type":"String"},{"name":"tutor","kind":"object","type":"User","relationName":"TutorBookings"},{"name":"tutorId","kind":"scalar","type":"String"},{"name":"tutorProfile","kind":"object","type":"TutorProfile","relationName":"BookingToTutorProfile"},{"name":"tutorProfileId","kind":"scalar","type":"String"},{"name":"availability","kind":"object","type":"TutorAvailability","relationName":"BookingToTutorAvailability"},{"name":"availabilityId","kind":"scalar","type":"String"},{"name":"scheduledStart","kind":"scalar","type":"DateTime"},{"name":"scheduledEnd","kind":"scalar","type":"DateTime"},{"name":"price","kind":"scalar","type":"Float"},{"name":"status","kind":"enum","type":"BookingStatus"},{"name":"paymentStatus","kind":"enum","type":"PaymentStatus"},{"name":"meetingLink","kind":"scalar","type":"String"},{"name":"notes","kind":"scalar","type":"String"},{"name":"cancelledById","kind":"scalar","type":"String"},{"name":"cancelReason","kind":"scalar","type":"String"},{"name":"review","kind":"object","type":"Review","relationName":"BookingToReview"},{"name":"payment","kind":"object","type":"Payment","relationName":"BookingToPayment"},{"name":"assignments","kind":"object","type":"Assignment","relationName":"AssignmentToBooking"},{"name":"createdAt","kind":"scalar","type":"DateTime"},{"name":"updatedAt","kind":"scalar","type":"DateTime"}],"dbName":null},"Category":{"fields":[{"name":"id","kind":"scalar","type":"String"},{"name":"name","kind":"scalar","type":"String"},{"name":"tutorLinks","kind":"object","type":"TutorCategory","relationName":"CategoryToTutorCategory"},{"name":"createdAt","kind":"scalar","type":"DateTime"},{"name":"updatedAt","kind":"scalar","type":"DateTime"}],"dbName":null},"Notification":{"fields":[{"name":"id","kind":"scalar","type":"String"},{"name":"userId","kind":"scalar","type":"String"},{"name":"user","kind":"object","type":"User","relationName":"NotificationToUser"},{"name":"title","kind":"scalar","type":"String"},{"name":"message","kind":"scalar","type":"String"},{"name":"type","kind":"enum","type":"NotificationType"},{"name":"isRead","kind":"scalar","type":"Boolean"},{"name":"createdAt","kind":"scalar","type":"DateTime"},{"name":"updatedAt","kind":"scalar","type":"DateTime"}],"dbName":null},"Payment":{"fields":[{"name":"id","kind":"scalar","type":"String"},{"name":"userId","kind":"scalar","type":"String"},{"name":"user","kind":"object","type":"User","relationName":"PaymentToUser"},{"name":"bookingId","kind":"scalar","type":"String"},{"name":"booking","kind":"object","type":"Booking","relationName":"BookingToPayment"},{"name":"amount","kind":"scalar","type":"Float"},{"name":"provider","kind":"enum","type":"PaymentProvider"},{"name":"status","kind":"enum","type":"PaymentTransactionStatus"},{"name":"transactionId","kind":"scalar","type":"String"},{"name":"paymentUrl","kind":"scalar","type":"String"},{"name":"createdAt","kind":"scalar","type":"DateTime"},{"name":"updatedAt","kind":"scalar","type":"DateTime"}],"dbName":null},"Review":{"fields":[{"name":"id","kind":"scalar","type":"String"},{"name":"booking","kind":"object","type":"Booking","relationName":"BookingToReview"},{"name":"bookingId","kind":"scalar","type":"String"},{"name":"student","kind":"object","type":"User","relationName":"StudentReviews"},{"name":"studentId","kind":"scalar","type":"String"},{"name":"tutor","kind":"object","type":"User","relationName":"TutorReviews"},{"name":"tutorId","kind":"scalar","type":"String"},{"name":"rating","kind":"scalar","type":"Int"},{"name":"comment","kind":"scalar","type":"String"},{"name":"createdAt","kind":"scalar","type":"DateTime"},{"name":"updatedAt","kind":"scalar","type":"DateTime"}],"dbName":null},"TutorProfile":{"fields":[{"name":"id","kind":"scalar","type":"String"},{"name":"user","kind":"object","type":"User","relationName":"TutorProfileToUser"},{"name":"userId","kind":"scalar","type":"String"},{"name":"bio","kind":"scalar","type":"String"},{"name":"hourlyRate","kind":"scalar","type":"Float"},{"name":"experienceYrs","kind":"scalar","type":"Int"},{"name":"location","kind":"scalar","type":"String"},{"name":"languages","kind":"scalar","type":"String"},{"name":"profileImage","kind":"scalar","type":"String"},{"name":"avgRating","kind":"scalar","type":"Float"},{"name":"totalReviews","kind":"scalar","type":"Int"},{"name":"totalEarnings","kind":"scalar","type":"Float"},{"name":"isApproved","kind":"scalar","type":"Boolean"},{"name":"categories","kind":"object","type":"TutorCategory","relationName":"TutorCategoryToTutorProfile"},{"name":"availability","kind":"object","type":"TutorAvailability","relationName":"TutorAvailabilityToTutorProfile"},{"name":"bookings","kind":"object","type":"Booking","relationName":"BookingToTutorProfile"},{"name":"createdAt","kind":"scalar","type":"DateTime"},{"name":"updatedAt","kind":"scalar","type":"DateTime"}],"dbName":null},"TutorAvailability":{"fields":[{"name":"id","kind":"scalar","type":"String"},{"name":"tutorProfile","kind":"object","type":"TutorProfile","relationName":"TutorAvailabilityToTutorProfile"},{"name":"tutorProfileId","kind":"scalar","type":"String"},{"name":"startTime","kind":"scalar","type":"DateTime"},{"name":"endTime","kind":"scalar","type":"DateTime"},{"name":"isBooked","kind":"scalar","type":"Boolean"},{"name":"bookings","kind":"object","type":"Booking","relationName":"BookingToTutorAvailability"},{"name":"createdAt","kind":"scalar","type":"DateTime"},{"name":"updatedAt","kind":"scalar","type":"DateTime"}],"dbName":null},"TutorRequest":{"fields":[{"name":"id","kind":"scalar","type":"String"},{"name":"user","kind":"object","type":"User","relationName":"tutorRequests"},{"name":"userId","kind":"scalar","type":"String"},{"name":"bio","kind":"scalar","type":"String"},{"name":"hourlyRate","kind":"scalar","type":"Float"},{"name":"experienceYrs","kind":"scalar","type":"Int"},{"name":"location","kind":"scalar","type":"String"},{"name":"languages","kind":"scalar","type":"String"},{"name":"status","kind":"scalar","type":"String"},{"name":"rejectionReason","kind":"scalar","type":"String"},{"name":"createdAt","kind":"scalar","type":"DateTime"},{"name":"updatedAt","kind":"scalar","type":"DateTime"}],"dbName":null},"TutorCategory":{"fields":[{"name":"id","kind":"scalar","type":"String"},{"name":"tutorProfile","kind":"object","type":"TutorProfile","relationName":"TutorCategoryToTutorProfile"},{"name":"tutorProfileId","kind":"scalar","type":"String"},{"name":"category","kind":"object","type":"Category","relationName":"CategoryToTutorCategory"},{"name":"categoryId","kind":"scalar","type":"String"}],"dbName":null}},"enums":{},"types":{}}');
+config.runtimeDataModel = JSON.parse('{"models":{"ActivityLog":{"fields":[{"name":"id","kind":"scalar","type":"String"},{"name":"userId","kind":"scalar","type":"String"},{"name":"action","kind":"scalar","type":"String"},{"name":"entity","kind":"scalar","type":"String"},{"name":"entityId","kind":"scalar","type":"String"},{"name":"metadata","kind":"scalar","type":"Json"},{"name":"createdAt","kind":"scalar","type":"DateTime"}],"dbName":null},"Admin":{"fields":[{"name":"id","kind":"scalar","type":"String"},{"name":"name","kind":"scalar","type":"String"},{"name":"email","kind":"scalar","type":"String"},{"name":"username","kind":"scalar","type":"String"},{"name":"profilePhoto","kind":"scalar","type":"String"},{"name":"contactNumber","kind":"scalar","type":"String"},{"name":"isDeleted","kind":"scalar","type":"Boolean"},{"name":"deletedAt","kind":"scalar","type":"DateTime"},{"name":"isActive","kind":"scalar","type":"Boolean"},{"name":"lastLoginAt","kind":"scalar","type":"DateTime"},{"name":"createdAt","kind":"scalar","type":"DateTime"},{"name":"updatedAt","kind":"scalar","type":"DateTime"},{"name":"userId","kind":"scalar","type":"String"},{"name":"user","kind":"object","type":"User","relationName":"AdminToUser"},{"name":"createdBy","kind":"scalar","type":"String"},{"name":"updatedBy","kind":"scalar","type":"String"}],"dbName":"admins"},"Assignment":{"fields":[{"name":"id","kind":"scalar","type":"String"},{"name":"title","kind":"scalar","type":"String"},{"name":"description","kind":"scalar","type":"String"},{"name":"files","kind":"scalar","type":"Json"},{"name":"status","kind":"enum","type":"AssignmentStatus"},{"name":"submissions","kind":"object","type":"AssignmentSubmission","relationName":"AssignmentToAssignmentSubmission"},{"name":"createdBy","kind":"object","type":"User","relationName":"AssignmentToUser"},{"name":"createdById","kind":"scalar","type":"String"},{"name":"booking","kind":"object","type":"Booking","relationName":"AssignmentToBooking"},{"name":"bookingId","kind":"scalar","type":"String"},{"name":"createdAt","kind":"scalar","type":"DateTime"},{"name":"updatedAt","kind":"scalar","type":"DateTime"}],"dbName":null},"AssignmentSubmission":{"fields":[{"name":"id","kind":"scalar","type":"String"},{"name":"assignment","kind":"object","type":"Assignment","relationName":"AssignmentToAssignmentSubmission"},{"name":"assignmentId","kind":"scalar","type":"String"},{"name":"student","kind":"object","type":"User","relationName":"StudentSubmissions"},{"name":"studentId","kind":"scalar","type":"String"},{"name":"files","kind":"scalar","type":"Json"},{"name":"status","kind":"enum","type":"AssignmentStatus"},{"name":"grade","kind":"scalar","type":"Float"},{"name":"gradedBy","kind":"object","type":"User","relationName":"GradedAssignments"},{"name":"gradedById","kind":"scalar","type":"String"},{"name":"evaluationReport","kind":"scalar","type":"Json"},{"name":"feedback","kind":"scalar","type":"String"},{"name":"createdAt","kind":"scalar","type":"DateTime"},{"name":"updatedAt","kind":"scalar","type":"DateTime"}],"dbName":null},"User":{"fields":[{"name":"id","kind":"scalar","type":"String"},{"name":"name","kind":"scalar","type":"String"},{"name":"email","kind":"scalar","type":"String"},{"name":"emailVerified","kind":"scalar","type":"Boolean"},{"name":"image","kind":"scalar","type":"String"},{"name":"role","kind":"enum","type":"UserRole"},{"name":"phone","kind":"scalar","type":"String"},{"name":"status","kind":"enum","type":"UserStatus"},{"name":"lastLoginAt","kind":"scalar","type":"DateTime"},{"name":"isDeleted","kind":"scalar","type":"Boolean"},{"name":"deletedAt","kind":"scalar","type":"DateTime"},{"name":"createdAt","kind":"scalar","type":"DateTime"},{"name":"updatedAt","kind":"scalar","type":"DateTime"},{"name":"submissions","kind":"object","type":"AssignmentSubmission","relationName":"StudentSubmissions"},{"name":"gradedAssignments","kind":"object","type":"AssignmentSubmission","relationName":"GradedAssignments"},{"name":"sessions","kind":"object","type":"Session","relationName":"SessionToUser"},{"name":"accounts","kind":"object","type":"Account","relationName":"AccountToUser"},{"name":"tutorProfile","kind":"object","type":"TutorProfile","relationName":"TutorProfileToUser"},{"name":"tutorRequests","kind":"object","type":"TutorRequest","relationName":"tutorRequests"},{"name":"admin","kind":"object","type":"Admin","relationName":"AdminToUser"},{"name":"studentBookings","kind":"object","type":"Booking","relationName":"StudentBookings"},{"name":"tutorBookings","kind":"object","type":"Booking","relationName":"TutorBookings"},{"name":"reviewsGiven","kind":"object","type":"Review","relationName":"StudentReviews"},{"name":"reviewsReceived","kind":"object","type":"Review","relationName":"TutorReviews"},{"name":"notifications","kind":"object","type":"Notification","relationName":"NotificationToUser"},{"name":"payments","kind":"object","type":"Payment","relationName":"PaymentToUser"},{"name":"assignments","kind":"object","type":"Assignment","relationName":"AssignmentToUser"}],"dbName":"user"},"Session":{"fields":[{"name":"id","kind":"scalar","type":"String"},{"name":"expiresAt","kind":"scalar","type":"DateTime"},{"name":"token","kind":"scalar","type":"String"},{"name":"createdAt","kind":"scalar","type":"DateTime"},{"name":"updatedAt","kind":"scalar","type":"DateTime"},{"name":"ipAddress","kind":"scalar","type":"String"},{"name":"userAgent","kind":"scalar","type":"String"},{"name":"userId","kind":"scalar","type":"String"},{"name":"user","kind":"object","type":"User","relationName":"SessionToUser"}],"dbName":"session"},"Account":{"fields":[{"name":"id","kind":"scalar","type":"String"},{"name":"accountId","kind":"scalar","type":"String"},{"name":"providerId","kind":"scalar","type":"String"},{"name":"userId","kind":"scalar","type":"String"},{"name":"user","kind":"object","type":"User","relationName":"AccountToUser"},{"name":"accessToken","kind":"scalar","type":"String"},{"name":"refreshToken","kind":"scalar","type":"String"},{"name":"idToken","kind":"scalar","type":"String"},{"name":"accessTokenExpiresAt","kind":"scalar","type":"DateTime"},{"name":"refreshTokenExpiresAt","kind":"scalar","type":"DateTime"},{"name":"scope","kind":"scalar","type":"String"},{"name":"password","kind":"scalar","type":"String"},{"name":"createdAt","kind":"scalar","type":"DateTime"},{"name":"updatedAt","kind":"scalar","type":"DateTime"}],"dbName":"account"},"Verification":{"fields":[{"name":"id","kind":"scalar","type":"String"},{"name":"identifier","kind":"scalar","type":"String"},{"name":"value","kind":"scalar","type":"String"},{"name":"expiresAt","kind":"scalar","type":"DateTime"},{"name":"createdAt","kind":"scalar","type":"DateTime"},{"name":"updatedAt","kind":"scalar","type":"DateTime"}],"dbName":"verification"},"Booking":{"fields":[{"name":"id","kind":"scalar","type":"String"},{"name":"student","kind":"object","type":"User","relationName":"StudentBookings"},{"name":"studentId","kind":"scalar","type":"String"},{"name":"tutor","kind":"object","type":"User","relationName":"TutorBookings"},{"name":"tutorId","kind":"scalar","type":"String"},{"name":"tutorProfile","kind":"object","type":"TutorProfile","relationName":"BookingToTutorProfile"},{"name":"tutorProfileId","kind":"scalar","type":"String"},{"name":"availability","kind":"object","type":"TutorAvailability","relationName":"BookingToTutorAvailability"},{"name":"availabilityId","kind":"scalar","type":"String"},{"name":"scheduledStart","kind":"scalar","type":"DateTime"},{"name":"scheduledEnd","kind":"scalar","type":"DateTime"},{"name":"price","kind":"scalar","type":"Float"},{"name":"status","kind":"enum","type":"BookingStatus"},{"name":"paymentStatus","kind":"enum","type":"PaymentStatus"},{"name":"meetingLink","kind":"scalar","type":"String"},{"name":"notes","kind":"scalar","type":"String"},{"name":"cancelledById","kind":"scalar","type":"String"},{"name":"cancelReason","kind":"scalar","type":"String"},{"name":"review","kind":"object","type":"Review","relationName":"BookingToReview"},{"name":"payment","kind":"object","type":"Payment","relationName":"BookingToPayment"},{"name":"assignments","kind":"object","type":"Assignment","relationName":"AssignmentToBooking"},{"name":"createdAt","kind":"scalar","type":"DateTime"},{"name":"updatedAt","kind":"scalar","type":"DateTime"}],"dbName":null},"Category":{"fields":[{"name":"id","kind":"scalar","type":"String"},{"name":"name","kind":"scalar","type":"String"},{"name":"tutorLinks","kind":"object","type":"TutorCategory","relationName":"CategoryToTutorCategory"},{"name":"createdAt","kind":"scalar","type":"DateTime"},{"name":"updatedAt","kind":"scalar","type":"DateTime"}],"dbName":null},"Notification":{"fields":[{"name":"id","kind":"scalar","type":"String"},{"name":"userId","kind":"scalar","type":"String"},{"name":"user","kind":"object","type":"User","relationName":"NotificationToUser"},{"name":"title","kind":"scalar","type":"String"},{"name":"message","kind":"scalar","type":"String"},{"name":"type","kind":"enum","type":"NotificationType"},{"name":"isRead","kind":"scalar","type":"Boolean"},{"name":"createdAt","kind":"scalar","type":"DateTime"},{"name":"updatedAt","kind":"scalar","type":"DateTime"}],"dbName":null},"Payment":{"fields":[{"name":"id","kind":"scalar","type":"String"},{"name":"userId","kind":"scalar","type":"String"},{"name":"user","kind":"object","type":"User","relationName":"PaymentToUser"},{"name":"bookingId","kind":"scalar","type":"String"},{"name":"booking","kind":"object","type":"Booking","relationName":"BookingToPayment"},{"name":"amount","kind":"scalar","type":"Float"},{"name":"provider","kind":"enum","type":"PaymentProvider"},{"name":"status","kind":"enum","type":"PaymentTransactionStatus"},{"name":"transactionId","kind":"scalar","type":"String"},{"name":"paymentUrl","kind":"scalar","type":"String"},{"name":"createdAt","kind":"scalar","type":"DateTime"},{"name":"updatedAt","kind":"scalar","type":"DateTime"}],"dbName":null},"Review":{"fields":[{"name":"id","kind":"scalar","type":"String"},{"name":"booking","kind":"object","type":"Booking","relationName":"BookingToReview"},{"name":"bookingId","kind":"scalar","type":"String"},{"name":"student","kind":"object","type":"User","relationName":"StudentReviews"},{"name":"studentId","kind":"scalar","type":"String"},{"name":"tutor","kind":"object","type":"User","relationName":"TutorReviews"},{"name":"tutorId","kind":"scalar","type":"String"},{"name":"rating","kind":"scalar","type":"Int"},{"name":"comment","kind":"scalar","type":"String"},{"name":"createdAt","kind":"scalar","type":"DateTime"},{"name":"updatedAt","kind":"scalar","type":"DateTime"}],"dbName":null},"TutorProfile":{"fields":[{"name":"id","kind":"scalar","type":"String"},{"name":"user","kind":"object","type":"User","relationName":"TutorProfileToUser"},{"name":"userId","kind":"scalar","type":"String"},{"name":"bio","kind":"scalar","type":"String"},{"name":"hourlyRate","kind":"scalar","type":"Float"},{"name":"experienceYrs","kind":"scalar","type":"Int"},{"name":"location","kind":"scalar","type":"String"},{"name":"languages","kind":"scalar","type":"String"},{"name":"profileImage","kind":"scalar","type":"String"},{"name":"institution","kind":"scalar","type":"String"},{"name":"avgRating","kind":"scalar","type":"Float"},{"name":"totalReviews","kind":"scalar","type":"Int"},{"name":"totalEarnings","kind":"scalar","type":"Float"},{"name":"isApproved","kind":"scalar","type":"Boolean"},{"name":"categories","kind":"object","type":"TutorCategory","relationName":"TutorCategoryToTutorProfile"},{"name":"availability","kind":"object","type":"TutorAvailability","relationName":"TutorAvailabilityToTutorProfile"},{"name":"bookings","kind":"object","type":"Booking","relationName":"BookingToTutorProfile"},{"name":"createdAt","kind":"scalar","type":"DateTime"},{"name":"updatedAt","kind":"scalar","type":"DateTime"}],"dbName":null},"TutorAvailability":{"fields":[{"name":"id","kind":"scalar","type":"String"},{"name":"tutorProfile","kind":"object","type":"TutorProfile","relationName":"TutorAvailabilityToTutorProfile"},{"name":"tutorProfileId","kind":"scalar","type":"String"},{"name":"startTime","kind":"scalar","type":"DateTime"},{"name":"endTime","kind":"scalar","type":"DateTime"},{"name":"isBooked","kind":"scalar","type":"Boolean"},{"name":"type","kind":"enum","type":"AvailabilityType"},{"name":"bookings","kind":"object","type":"Booking","relationName":"BookingToTutorAvailability"},{"name":"createdAt","kind":"scalar","type":"DateTime"},{"name":"updatedAt","kind":"scalar","type":"DateTime"}],"dbName":null},"TutorRequest":{"fields":[{"name":"id","kind":"scalar","type":"String"},{"name":"user","kind":"object","type":"User","relationName":"tutorRequests"},{"name":"userId","kind":"scalar","type":"String"},{"name":"bio","kind":"scalar","type":"String"},{"name":"hourlyRate","kind":"scalar","type":"Float"},{"name":"experienceYrs","kind":"scalar","type":"Int"},{"name":"location","kind":"scalar","type":"String"},{"name":"languages","kind":"scalar","type":"String"},{"name":"institution","kind":"scalar","type":"String"},{"name":"categories","kind":"scalar","type":"String"},{"name":"status","kind":"scalar","type":"String"},{"name":"rejectionReason","kind":"scalar","type":"String"},{"name":"createdAt","kind":"scalar","type":"DateTime"},{"name":"updatedAt","kind":"scalar","type":"DateTime"}],"dbName":null},"TutorCategory":{"fields":[{"name":"id","kind":"scalar","type":"String"},{"name":"tutorProfile","kind":"object","type":"TutorProfile","relationName":"TutorCategoryToTutorProfile"},{"name":"tutorProfileId","kind":"scalar","type":"String"},{"name":"category","kind":"object","type":"Category","relationName":"CategoryToTutorCategory"},{"name":"categoryId","kind":"scalar","type":"String"}],"dbName":null}},"enums":{},"types":{}}');
 async function decodeBase64AsWasm(wasmBase64) {
   const { Buffer: Buffer2 } = await import("buffer");
   const wasmArray = Buffer2.from(wasmBase64, "base64");
@@ -194,6 +194,7 @@ var AssignmentScalarFieldEnum = {
   id: "id",
   title: "title",
   description: "description",
+  files: "files",
   status: "status",
   createdById: "createdById",
   bookingId: "bookingId",
@@ -208,6 +209,7 @@ var AssignmentSubmissionScalarFieldEnum = {
   status: "status",
   grade: "grade",
   gradedById: "gradedById",
+  evaluationReport: "evaluationReport",
   feedback: "feedback",
   createdAt: "createdAt",
   updatedAt: "updatedAt"
@@ -325,6 +327,7 @@ var TutorProfileScalarFieldEnum = {
   location: "location",
   languages: "languages",
   profileImage: "profileImage",
+  institution: "institution",
   avgRating: "avgRating",
   totalReviews: "totalReviews",
   totalEarnings: "totalEarnings",
@@ -338,6 +341,7 @@ var TutorAvailabilityScalarFieldEnum = {
   startTime: "startTime",
   endTime: "endTime",
   isBooked: "isBooked",
+  type: "type",
   createdAt: "createdAt",
   updatedAt: "updatedAt"
 };
@@ -349,6 +353,8 @@ var TutorRequestScalarFieldEnum = {
   experienceYrs: "experienceYrs",
   location: "location",
   languages: "languages",
+  institution: "institution",
+  categories: "categories",
   status: "status",
   rejectionReason: "rejectionReason",
   createdAt: "createdAt",
@@ -546,7 +552,7 @@ var sendEmail = async ({
         `Email template "${templateName}" not found`
       );
     }
-    const html = await ejs.renderFile(templatePath, templateData);
+    const html = await ejs.renderFile(templatePath, { ...templateData, subject });
     const info = await transporter.sendMail({
       from: `"SkillBridge" <${envVars.EMAIL_SENDER.SMTP_FROM}>`,
       to,
@@ -1651,13 +1657,15 @@ import { Router as Router3 } from "express";
 import status6 from "http-status";
 var augmentSlotWith30DayPricing = (slot, hourlyRate) => {
   const durationHours = (slot.endTime.getTime() - slot.startTime.getTime()) / (1e3 * 60 * 60);
-  const thirtyDaysPrice = hourlyRate * durationHours * 30;
+  const isPackage = slot.type === "PACKAGE_30D";
+  const factor = isPackage ? 30 : 1;
+  const totalPrice = hourlyRate * durationHours * factor;
   return {
     ...slot,
     durationHours,
-    thirtyDaysPrice,
-    packageType: "30-Day Contract",
-    notes: `Available for a fixed daily time from ${slot.startTime.toLocaleTimeString()} to ${slot.endTime.toLocaleTimeString()} matching exactly 30 days total calculated.`
+    totalPrice,
+    packageType: isPackage ? "30-Day Private" : "Single Session",
+    notes: isPackage ? `Fixed daily time from ${slot.startTime.toLocaleTimeString()} to ${slot.endTime.toLocaleTimeString()} for 30 consecutive days.` : `Single one-on-one session at the specified time.`
   };
 };
 var createAvailability = async (tutorProfileId, slots) => {
@@ -1671,13 +1679,29 @@ var createAvailability = async (tutorProfileId, slots) => {
   const data = slots.map((s) => ({
     tutorProfileId,
     startTime: new Date(s.startTime),
-    endTime: new Date(s.endTime)
+    endTime: new Date(s.endTime),
+    type: s.type || "SINGLE"
   }));
   await prisma.tutorAvailability.createMany({ data });
   const createdSlots = await prisma.tutorAvailability.findMany({
     where: { tutorProfileId },
     orderBy: { startTime: "asc" }
   });
+  const tutor = await prisma.user.findFirst({
+    where: { tutorProfile: { id: tutorProfileId } },
+    select: { id: true }
+  });
+  if (tutor) {
+    await prisma.notification.create({
+      data: {
+        userId: tutor.id,
+        title: "Availability Synchronized",
+        message: "Your teaching availability has been successfully updated and is now visible to students.",
+        type: "SYSTEM"
+      }
+    }).catch(() => {
+    });
+  }
   return createdSlots.map(
     (slot) => augmentSlotWith30DayPricing(slot, profile.hourlyRate)
   );
@@ -2438,15 +2462,19 @@ var uploadFileToCloudinary = async (buffer, fileName, folderPrefix = "SkillBridg
     throw new AppError_default(status12.BAD_REQUEST, "File buffer and file name required");
   }
   const extension = fileName.split(".").pop()?.toLowerCase();
+  const isPdf = extension === "pdf" || extension === "doc" || extension === "docx";
   const fileNameWithoutExtension = fileName.split(".").slice(0, -1).join(".").toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9\-]/g, "");
   const uniqueName = Math.random().toString(36).substring(2) + "-" + Date.now() + "-" + fileNameWithoutExtension;
-  const folder = extension === "pdf" ? "assignments" : "images";
+  const folder = isPdf ? "assignments" : "images";
+  const resource_type = isPdf ? "image" : "auto";
   const result = await new Promise((resolve, reject) => {
     cloudinary.uploader.upload_stream(
       {
-        resource_type: extension === "pdf" ? "raw" : "auto",
+        resource_type,
         public_id: uniqueName,
-        folder: `${folderPrefix}/${folder}`
+        folder: `${folderPrefix}/${folder}`,
+        type: "upload",
+        access_mode: "public"
       },
       (error, result2) => {
         if (error) return reject(error);
@@ -2457,7 +2485,8 @@ var uploadFileToCloudinary = async (buffer, fileName, folderPrefix = "SkillBridg
   return { url: result.secure_url, publicId: result.public_id, type: extension || "file" };
 };
 var deleteFileFromCloudinary = async (publicId, type) => {
-  const resource_type = type === "pdf" ? "raw" : "image";
+  const isDocument = type === "doc" || type === "docx";
+  const resource_type = isDocument ? "raw" : "image";
   await cloudinary.uploader.destroy(publicId, { resource_type });
 };
 
@@ -2500,6 +2529,15 @@ var updateUser = async (userId, payload, file) => {
       ...payload,
       ...profilePhotoData
     }
+  });
+  await prisma.notification.create({
+    data: {
+      userId,
+      title: "Account Information Updated",
+      message: "Your basic profile details and images have been successfully synchronized.",
+      type: "SYSTEM"
+    }
+  }).catch(() => {
   });
   return updatedUser;
 };
@@ -2606,12 +2644,23 @@ import { CloudinaryStorage } from "multer-storage-cloudinary";
 var storage = new CloudinaryStorage({
   cloudinary,
   params: async (req, file) => {
-    const extension = file.originalname.split(".").pop()?.toLowerCase();
-    const folder = extension === "pdf" ? "assignments" : "images";
+    const fileName = file?.originalname || "unknown";
+    const extension = fileName.split(".").pop()?.toLowerCase() || "";
+    const isImage = ["jpg", "jpeg", "png", "gif", "webp", "svg"].includes(extension);
+    const isPdf = extension === "pdf";
+    const resource_type = isPdf ? "image" : isImage ? "auto" : "raw";
+    const folder = isImage ? "images" : "assignments";
+    const baseName = fileName.substring(0, fileName.lastIndexOf(".")) || fileName;
+    const sanitizedName = baseName.replace(/[^a-zA-Z0-9]/g, "_") || "file";
+    const public_id = resource_type === "raw" ? `${Date.now()}_${sanitizedName}.${extension}` : `${Date.now()}_${sanitizedName}`;
     return {
       folder: `SkillBridge/${folder}`,
-      resource_type: extension === "pdf" ? "raw" : "auto",
-      public_id: `${Date.now()}-${file.originalname}`
+      resource_type,
+      ...(isImage || isPdf) && { format: extension },
+      ...isPdf && { transformation: [{ flags: "attachment" }] },
+      type: "upload",
+      access_mode: "public",
+      public_id
     };
   }
 });
@@ -2800,9 +2849,25 @@ var deleteBooking = async (id) => {
         data: { isBooked: false }
       });
     }
-    return tx.booking.delete({
+    const deleted = await tx.booking.delete({
       where: { id }
     });
+    const notifyData = [
+      {
+        userId: existingBooking.studentId,
+        title: "Booking Removed by Admin",
+        message: "An administrator has removed your booking. If this was unexpected, please contact support.",
+        type: "SYSTEM"
+      },
+      {
+        userId: existingBooking.tutorId,
+        title: "Booking Removed by Admin",
+        message: "An administrator has removed a booking from your schedule.",
+        type: "SYSTEM"
+      }
+    ];
+    await tx.notification.createMany({ data: notifyData });
+    return deleted;
   });
 };
 var getAllCategories2 = async () => {
@@ -2874,6 +2939,14 @@ var deleteReview = async (id) => {
         totalReviews: stats._count.rating
       }
     });
+    await tx.notification.create({
+      data: {
+        userId: existingReview.tutorId,
+        title: "Review Moderated",
+        message: "A review on your profile was removed by an administrator following moderation.",
+        type: "SYSTEM"
+      }
+    });
     return deleted;
   });
 };
@@ -2896,7 +2969,22 @@ var getAllAssignments = async () => {
 var deleteAssignment = async (id) => {
   const assignment = await prisma.assignment.findUnique({ where: { id } });
   if (!assignment) throw new AppError_default(status15.NOT_FOUND, "Assignment not found");
-  return prisma.assignment.delete({ where: { id } });
+  const result = await prisma.assignment.delete({ where: { id } });
+  if (assignment.bookingId) {
+    const booking = await prisma.booking.findUnique({ where: { id: assignment.bookingId } });
+    if (booking) {
+      await prisma.notification.create({
+        data: {
+          userId: booking.studentId,
+          title: "Assignment Removed",
+          message: `An assignment (${assignment.title}) has been removed by an administrator.`,
+          type: "SYSTEM"
+        }
+      }).catch(() => {
+      });
+    }
+  }
+  return result;
 };
 var updateBookingStatus = async (id, newStatus) => {
   const booking = await prisma.booking.findUnique({ where: { id } });
@@ -3671,6 +3759,15 @@ var registerUser = async (payload) => {
         email
       }
     });
+    await prisma.notification.create({
+      data: {
+        userId: user.id,
+        title: "Welcome to SkillBridge! \u{1F389}",
+        message: "We're excited to have you here! Explore categories and find the perfect tutor to start your learning journey.",
+        type: "SYSTEM"
+      }
+    }).catch(() => {
+    });
     return { user };
   } catch (err) {
     try {
@@ -3708,8 +3805,20 @@ var loginUser = async (payload) => {
     update: {
       lastLoginAt: /* @__PURE__ */ new Date(),
       ...data.user.emailVerified && { emailVerified: true }
+    },
+    include: {
+      tutorProfile: {
+        select: { profileImage: true }
+      }
     }
   });
+  if (!dbUser.image && dbUser.role === "TUTOR" && dbUser.tutorProfile?.profileImage) {
+    dbUser.image = dbUser.tutorProfile.profileImage;
+    await prisma.user.update({
+      where: { id: dbUser.id },
+      data: { image: dbUser.tutorProfile.profileImage }
+    });
+  }
   const userSessions = await prisma.session.findMany({
     where: { userId: dbUser.id },
     orderBy: { createdAt: "desc" }
@@ -3729,10 +3838,18 @@ var loginUser = async (payload) => {
 };
 var getMe2 = async (userId) => {
   const user = await prisma.user.findUnique({
-    where: { id: userId }
+    where: { id: userId },
+    include: {
+      tutorProfile: {
+        select: { profileImage: true }
+      }
+    }
   });
   if (!user || user.isDeleted) {
     throw new AppError_default(status20.NOT_FOUND, "User not found");
+  }
+  if (!user.image && user.role === "TUTOR" && user.tutorProfile?.profileImage) {
+    user.image = user.tutorProfile.profileImage;
   }
   return user;
 };
@@ -4109,6 +4226,7 @@ var tutorProfileSelect = {
   totalReviews: true,
   totalEarnings: true,
   isApproved: true,
+  institution: true,
   createdAt: true,
   updatedAt: true,
   categories: {
@@ -4204,6 +4322,8 @@ var requestToBecomeTutor = async (userId, payload) => {
       experienceYrs: payload.experienceYrs,
       location: payload.location ?? null,
       languages: payload.languages ?? null,
+      institution: payload.institution ?? null,
+      categories: payload.categories ?? [],
       status: "PENDING"
     },
     select: {
@@ -4214,12 +4334,23 @@ var requestToBecomeTutor = async (userId, payload) => {
       experienceYrs: true,
       location: true,
       languages: true,
+      institution: true,
+      categories: true,
       status: true,
       createdAt: true,
       user: {
         select: { id: true, name: true, email: true, role: true }
       }
     }
+  });
+  await prisma.notification.create({
+    data: {
+      userId,
+      title: "Tutor Application Received",
+      message: "Your request to join the SkillBridge tutor pool has been successfully submitted and is currently being moderated.",
+      type: "SYSTEM"
+    }
+  }).catch(() => {
   });
   return tutorRequest;
 };
@@ -4246,6 +4377,7 @@ var approveTutorRequest = async (requestId) => {
         experienceYrs: tutorRequest.experienceYrs,
         location: tutorRequest.location ?? null,
         languages: tutorRequest.languages ?? null,
+        institution: tutorRequest.institution ?? null,
         isApproved: true
       },
       select: tutorProfileSelect
@@ -4258,6 +4390,24 @@ var approveTutorRequest = async (requestId) => {
       where: { id: requestId },
       data: { status: "APPROVED" }
     });
+    if (tutorRequest.categories && tutorRequest.categories.length > 0) {
+      const categories = await tx.category.findMany({
+        where: {
+          name: {
+            in: tutorRequest.categories,
+            mode: "insensitive"
+          }
+        }
+      });
+      if (categories.length > 0) {
+        await tx.tutorCategory.createMany({
+          data: categories.map((cat) => ({
+            tutorProfileId: tutorProfile.id,
+            categoryId: cat.id
+          }))
+        });
+      }
+    }
     await tx.notification.create({
       data: {
         userId: tutorRequest.userId,
@@ -4390,6 +4540,7 @@ var updateTutorProfile = async (userId, payload, file) => {
     };
   }
   const result = await prisma.$transaction(async (tx) => {
+    const finalProfileImage = profileImageData.profileImage || payload.profileImage;
     await tx.tutorProfile.update({
       where: { userId },
       data: {
@@ -4397,6 +4548,12 @@ var updateTutorProfile = async (userId, payload, file) => {
         ...profileImageData
       }
     });
+    if (finalProfileImage) {
+      await tx.user.update({
+        where: { id: userId },
+        data: { image: finalProfileImage }
+      });
+    }
     if (categoryNames !== void 0) {
       const categories = await tx.category.findMany({
         where: {
@@ -4422,6 +4579,15 @@ var updateTutorProfile = async (userId, payload, file) => {
       where: { userId },
       select: tutorProfileSelect
     });
+  });
+  await prisma.notification.create({
+    data: {
+      userId,
+      title: "Tutor Profile Synchronized Successfully",
+      message: "Your professional bio, rates, and category expertise have been updated for all students.",
+      type: "SYSTEM"
+    }
+  }).catch(() => {
   });
   return result;
 };
@@ -4553,7 +4719,9 @@ var createTutorValidation = z6.object({
       experienceYrs: z6.number().int().nonnegative("Experience years must be non-negative"),
       location: z6.string().optional(),
       languages: z6.string().optional(),
-      profileImage: z6.string().url("Invalid URL").optional()
+      profileImage: z6.string().url("Invalid URL").optional(),
+      institution: z6.string().optional(),
+      categories: z6.array(z6.string()).optional()
     })
   })
 });
@@ -4563,7 +4731,9 @@ var createTutorRequestValidation = z6.object({
     hourlyRate: z6.number().positive("Hourly rate must be positive"),
     experienceYrs: z6.number().int().nonnegative("Experience years must be non-negative"),
     location: z6.string().optional(),
-    languages: z6.string().optional()
+    languages: z6.string().optional(),
+    institution: z6.string().optional(),
+    categories: z6.array(z6.string()).optional()
   })
 });
 var updateTutorValidation = z6.object({
@@ -4574,6 +4744,7 @@ var updateTutorValidation = z6.object({
     location: z6.string().optional(),
     languages: z6.string().optional(),
     profileImage: z6.string().nullable().optional(),
+    institution: z6.string().optional(),
     categories: z6.array(z6.string()).optional()
   })
 });
@@ -5425,6 +5596,7 @@ var stripe = new Stripe(envVars.STRIPE.STRIPE_SECRET_KEY);
 
 // src/modules/payment/payment.service.ts
 var processSuccessfulPayment = async (internalPaymentId, bookingId, amount) => {
+  const meetingLink = `https://meet.jit.si/SkillBridge-${bookingId.slice(-8)}`;
   const result = await prisma.$transaction(async (tx) => {
     const payment = await tx.payment.findUnique({
       where: { id: internalPaymentId },
@@ -5441,7 +5613,12 @@ var processSuccessfulPayment = async (internalPaymentId, bookingId, amount) => {
     });
     await tx.booking.update({
       where: { id: bookingId },
-      data: { paymentStatus: "PAID", status: "CONFIRMED" }
+      data: {
+        paymentStatus: "PAID",
+        status: "CONFIRMED",
+        meetingLink
+        // 🔥 Inject instant meeting link
+      }
     });
     if (payment.booking.tutorProfileId) {
       await tx.tutorProfile.update({
@@ -5454,13 +5631,13 @@ var processSuccessfulPayment = async (internalPaymentId, bookingId, amount) => {
         {
           userId: payment.userId,
           title: "Payment Successful \u2705",
-          message: `Your payment of \u09F3${amount} has been processed successfully. Your session is now fully confirmed!`,
+          message: `Your payment of \u09F3${amount} has been processed. Your session is now fully confirmed! Meeting: ${meetingLink}`,
           type: "PAYMENT"
         },
         {
           userId: payment.booking.tutorId,
           title: "Student Payment Received",
-          message: `A student has completed payment for their booking. The session is now fully confirmed.`,
+          message: `A student has completed payment. The session is now fully confirmed. Meeting: ${meetingLink}`,
           type: "PAYMENT"
         }
       ]
@@ -5479,14 +5656,17 @@ var processSuccessfulPayment = async (internalPaymentId, bookingId, amount) => {
       courseName: `1-on-1 Tutoring Session with ${tutor.name}`,
       enrollmentDate: new Date(booking.createdAt).toLocaleDateString(),
       amount,
-      invoiceUrl: ""
-      // Optionally add a link if PDF downloads are later implemented
+      meetingLink
+      // 🔥 Send link in email
     };
     await sendEmail({
       to: student.email,
       subject: "Payment Invoice & Session Confirmation - SkillBridge",
       templateName: "invoice",
-      templateData: invoiceData
+      templateData: {
+        ...invoiceData,
+        notes: `Your private session is confirmed. Link: ${meetingLink}`
+      }
     }).catch(console.error);
     await sendEmail({
       to: tutor.email,
@@ -5495,8 +5675,8 @@ var processSuccessfulPayment = async (internalPaymentId, bookingId, amount) => {
       templateData: {
         ...invoiceData,
         studentName: tutor.name,
-        // Adjust greeting for tutor
-        courseName: `1-on-1 Tutoring Session booked by ${student.name}`
+        courseName: `1-on-1 Tutoring Session booked by ${student.name}`,
+        notes: `New booking confirmed. Meeting Link: ${meetingLink}`
       }
     }).catch(console.error);
   }
@@ -5843,27 +6023,33 @@ import { Router as Router12 } from "express";
 // src/modules/assignment/assignment.service.ts
 import status28 from "http-status";
 var AssignmentService = {
-  createAssignment: async (tutorId, title, description, bookingId) => {
+  createAssignment: async (tutorId, title, description, bookingId, files) => {
     let studentIdToNotify = null;
+    let studentEmailToNotify = null;
+    let studentNameToNotify = null;
     if (bookingId) {
       const booking = await prisma.booking.findUnique({
-        where: { id: bookingId }
+        where: { id: bookingId },
+        include: { student: { select: { id: true, email: true, name: true } } }
       });
       if (!booking) {
         throw new AppError_default(status28.NOT_FOUND, "Associated booking not found");
       }
-      if (booking.tutorId !== tutorId) {
-        throw new AppError_default(
-          status28.FORBIDDEN,
-          "You can only assign work logically mapped to your own native bookings"
-        );
-      }
       studentIdToNotify = booking.studentId;
+      studentEmailToNotify = booking.student.email;
+      studentNameToNotify = booking.student.name;
     }
+    const filePayloads = files?.map((file) => ({
+      url: file.path || file.url,
+      publicId: file.filename || file.public_id,
+      type: file.mimetype,
+      name: file.originalname
+    }));
     const createdAssignment = await prisma.assignment.create({
       data: {
         title,
         description: description || null,
+        files: filePayloads ? filePayloads : null,
         createdById: tutorId,
         bookingId: bookingId || null,
         status: "PENDING"
@@ -5874,10 +6060,25 @@ var AssignmentService = {
         data: {
           userId: studentIdToNotify,
           title: "New Assignment Received",
-          message: `Your tutor has posted a new explicitly assigned task specifically matching your class: ${title}`,
+          message: `Your tutor has posted a new task: ${title}. ${filePayloads ? "Reference PDFs attached." : ""}`,
           type: "SYSTEM"
         }
       });
+      if (studentEmailToNotify) {
+        await sendEmail({
+          to: studentEmailToNotify,
+          subject: `New Assignment: ${title} - SkillBridge`,
+          templateName: "assignment",
+          templateData: {
+            studentName: studentNameToNotify || "Student",
+            title: "New Assignment Received",
+            message: `Your tutor has uploaded a new assignment with attached resources.`,
+            assignmentTitle: title,
+            files: filePayloads || [],
+            dashboardUrl: `${envVars.FRONTEND_URL}/dashboard/assignments`
+          }
+        }).catch(console.error);
+      }
     }
     return createdAssignment;
   },
@@ -5895,7 +6096,12 @@ var AssignmentService = {
       return prisma.assignment.findMany({
         where: { createdById: userId },
         include: {
-          submissions: { select: { id: true, status: true, grade: true } },
+          submissions: {
+            include: {
+              student: { select: { name: true, email: true, image: true } }
+            },
+            orderBy: { createdAt: "desc" }
+          },
           booking: { include: { student: { select: { name: true, email: true } } } }
         },
         orderBy: { createdAt: "desc" }
@@ -5912,8 +6118,8 @@ var AssignmentService = {
       include: {
         createdBy: { select: { name: true, email: true, image: true } },
         submissions: {
-          where: { studentId: userId },
-          select: { id: true, status: true, grade: true }
+          where: { studentId: userId }
+          // Include essential submission fields for student audit
         }
       },
       orderBy: { createdAt: "desc" }
@@ -5991,7 +6197,7 @@ var AssignmentService = {
     });
     return submission;
   },
-  evaluateSubmission: async (assignmentId, submissionId, tutorId, grade, feedback) => {
+  evaluateSubmission: async (assignmentId, submissionId, tutorId, grade, feedback, reportFile) => {
     return prisma.$transaction(async (tx) => {
       const assignment = await tx.assignment.findUnique({
         where: { id: assignmentId }
@@ -6000,25 +6206,25 @@ var AssignmentService = {
         throw new AppError_default(status28.NOT_FOUND, "Parent Assignment structurally missing");
       }
       if (assignment.createdById !== tutorId) {
-        throw new AppError_default(
-          status28.FORBIDDEN,
-          "Evaluations strictly designated exclusively matching the assigned original Tutor profile mapped."
-        );
+        throw new AppError_default(status28.FORBIDDEN, "Only the creating tutor can evaluate this task.");
       }
       const submission = await tx.assignmentSubmission.findUnique({
-        where: { id: submissionId }
+        where: { id: submissionId },
+        include: { student: { select: { id: true, email: true, name: true } } }
       });
       if (!submission) {
-        throw new AppError_default(
-          status28.NOT_FOUND,
-          "Target answersheet missing entirely natively evaluated."
-        );
+        throw new AppError_default(status28.NOT_FOUND, "Target answersheet missing");
       }
-      if (submission.assignmentId !== assignmentId) {
-        throw new AppError_default(
-          status28.BAD_REQUEST,
-          "Mismatch detected mapping evaluations against disjoint sets natively."
-        );
+      let reportData = null;
+      if (reportFile) {
+        const fileObj = reportFile;
+        reportData = {
+          url: fileObj.path || fileObj.url,
+          publicId: fileObj.filename || fileObj.public_id,
+          type: fileObj.mimetype,
+          size: fileObj.size,
+          name: fileObj.originalname
+        };
       }
       const evaluated = await tx.assignmentSubmission.update({
         where: { id: submissionId },
@@ -6026,7 +6232,8 @@ var AssignmentService = {
           grade,
           feedback: feedback || null,
           gradedById: tutorId,
-          status: "GRADED"
+          status: "GRADED",
+          evaluationReport: reportData ? reportData : null
         }
       });
       await tx.assignment.update({
@@ -6037,10 +6244,26 @@ var AssignmentService = {
         data: {
           userId: submission.studentId,
           title: "Assignment Evaluated",
-          message: `Your assignment has been graded. You received a score of ${grade}.`,
+          message: `Your assignment has been graded. Score: ${grade}. ${reportData ? "Detailed PDF report attached." : ""}`,
           type: "SYSTEM"
         }
       });
+      if (submission.student.email) {
+        await sendEmail({
+          to: submission.student.email,
+          subject: `Assignment Evaluated: ${assignment.title} - SkillBridge`,
+          templateName: "assignment",
+          templateData: {
+            studentName: submission.student.name,
+            title: "Evaluation Complete",
+            message: `Your assignment has been graded. A professional evaluation report is available for download.`,
+            assignmentTitle: assignment.title,
+            grade,
+            files: reportData ? [reportData] : [],
+            dashboardUrl: `${envVars.FRONTEND_URL}/dashboard/assignments`
+          }
+        }).catch(console.error);
+      }
       return evaluated;
     });
   }
@@ -6051,6 +6274,7 @@ import status29 from "http-status";
 var AssignmentController = {
   createAssignment: catchAsync_default(async (req, res) => {
     const { title, description, bookingId } = req.body;
+    const files = req.files;
     if (!title || typeof title !== "string") {
       return res.status(status29.BAD_REQUEST).json({
         success: false,
@@ -6061,7 +6285,8 @@ var AssignmentController = {
       req.user.userId,
       title,
       description,
-      bookingId
+      bookingId,
+      files
     );
     sendResponse(res, {
       httpStatusCode: status29.CREATED,
@@ -6120,7 +6345,10 @@ var AssignmentController = {
     const assignmentId = req.params.assignmentId;
     const submissionId = req.params.submissionId;
     const { grade, feedback } = req.body;
-    if (grade === void 0 || typeof grade !== "number") {
+    const files = req.files;
+    const reportFile = files && files.length > 0 ? files[0] : void 0;
+    const parsedGrade = Number(grade);
+    if (isNaN(parsedGrade)) {
       return res.status(status29.BAD_REQUEST).json({
         success: false,
         message: "grade must be a valid number"
@@ -6130,8 +6358,9 @@ var AssignmentController = {
       assignmentId,
       submissionId,
       req.user.userId,
-      grade,
-      feedback
+      parsedGrade,
+      feedback,
+      reportFile
     );
     sendResponse(res, {
       httpStatusCode: status29.OK,
@@ -6147,6 +6376,7 @@ var router13 = Router12();
 router13.post(
   "/",
   checkAuth_default("TUTOR" /* TUTOR */),
+  multerUpload.array("files", 5),
   AssignmentController.createAssignment
 );
 router13.get(
@@ -6168,6 +6398,7 @@ router13.post(
 router13.patch(
   "/:assignmentId/submissions/:submissionId/evaluate",
   checkAuth_default("TUTOR" /* TUTOR */),
+  multerUpload.array("files", 1),
   AssignmentController.evaluateSubmission
 );
 var AssignmentRoutes = router13;

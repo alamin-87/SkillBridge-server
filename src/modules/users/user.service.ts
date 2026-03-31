@@ -58,6 +58,16 @@ const updateUser = async (
     },
   });
 
+  // 🔥 Notify user about profile update
+  await prisma.notification.create({
+    data: {
+      userId,
+      title: "Account Information Updated",
+      message: "Your basic profile details and images have been successfully synchronized.",
+      type: "SYSTEM",
+    },
+  }).catch(() => {});
+
   return updatedUser;
 };
 

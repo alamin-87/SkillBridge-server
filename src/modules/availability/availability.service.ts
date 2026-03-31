@@ -11,14 +11,19 @@ type SlotInput = {
 const augmentSlotWith30DayPricing = (slot: any, hourlyRate: number) => {
   const durationHours =
     (slot.endTime.getTime() - slot.startTime.getTime()) / (1000 * 60 * 60);
-  const thirtyDaysPrice = hourlyRate * durationHours * 30;
+
+  const isPackage = slot.type === "PACKAGE_30D";
+  const factor = isPackage ? 30 : 1;
+  const totalPrice = hourlyRate * durationHours * factor;
 
   return {
     ...slot,
     durationHours,
-    thirtyDaysPrice,
-    packageType: "30-Day Contract",
-    notes: `Available for a fixed daily time from ${slot.startTime.toLocaleTimeString()} to ${slot.endTime.toLocaleTimeString()} matching exactly 30 days total calculated.`,
+    totalPrice,
+    packageType: isPackage ? "30-Day Private" : "Single Session",
+    notes: isPackage
+      ? `Fixed daily time from ${slot.startTime.toLocaleTimeString()} to ${slot.endTime.toLocaleTimeString()} for 30 consecutive days.`
+      : `Single one-on-one session at the specified time.`,
   };
 };
 
@@ -35,10 +40,11 @@ const createAvailability = async (
     throw new AppError(status.NOT_FOUND, "Tutor profile not found");
   }
 
-  const data = slots.map((s) => ({
+  const data = slots.map((s: any) => ({
     tutorProfileId,
     startTime: new Date(s.startTime),
     endTime: new Date(s.endTime),
+    type: s.type || "SINGLE",
   }));
 
   // Atomically recreate exact requested slots
@@ -48,6 +54,23 @@ const createAvailability = async (
     where: { tutorProfileId },
     orderBy: { startTime: "asc" },
   });
+
+  // 🔥 Notify tutor
+  const tutor = await prisma.user.findFirst({
+    where: { tutorProfile: { id: tutorProfileId } },
+    select: { id: true },
+  });
+
+  if (tutor) {
+    await prisma.notification.create({
+      data: {
+        userId: tutor.id,
+        title: "Availability Synchronized",
+        message: "Your teaching availability has been successfully updated and is now visible to students.",
+        type: "SYSTEM",
+      },
+    }).catch(() => {});
+  }
 
   // Return mapped 30-day package indicators inherently matching new platform behavior guidelines
   return createdSlots.map((slot) =>

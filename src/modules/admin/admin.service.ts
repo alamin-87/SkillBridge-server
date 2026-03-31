@@ -187,9 +187,29 @@ const deleteBooking = async (id: string) => {
       });
     }
 
-    return tx.booking.delete({
+    const deleted = await tx.booking.delete({
       where: { id },
     });
+
+    // Notify student & tutor
+    const notifyData = [
+      {
+        userId: existingBooking.studentId,
+        title: "Booking Removed by Admin",
+        message: "An administrator has removed your booking. If this was unexpected, please contact support.",
+        type: "SYSTEM" as const,
+      },
+      {
+        userId: existingBooking.tutorId,
+        title: "Booking Removed by Admin",
+        message: "An administrator has removed a booking from your schedule.",
+        type: "SYSTEM" as const,
+      }
+    ];
+
+    await tx.notification.createMany({ data: notifyData });
+
+    return deleted;
   });
 };
 
@@ -278,6 +298,15 @@ const deleteReview = async (id: string) => {
       },
     });
 
+    await tx.notification.create({
+      data: {
+        userId: existingReview.tutorId,
+        title: "Review Moderated",
+        message: "A review on your profile was removed by an administrator following moderation.",
+        type: "SYSTEM",
+      },
+    });
+
     return deleted;
   });
 };
@@ -304,7 +333,24 @@ const deleteAssignment = async (id: string) => {
   const assignment = await prisma.assignment.findUnique({ where: { id } });
   if (!assignment) throw new AppError(status.NOT_FOUND, "Assignment not found");
   
-  return prisma.assignment.delete({ where: { id } });
+  const result = await prisma.assignment.delete({ where: { id } });
+
+  // If bound to a booking, notify the student
+  if (assignment.bookingId) {
+    const booking = await prisma.booking.findUnique({ where: { id: assignment.bookingId } });
+    if (booking) {
+      await prisma.notification.create({
+        data: {
+          userId: booking.studentId,
+          title: "Assignment Removed",
+          message: `An assignment (${assignment.title}) has been removed by an administrator.`,
+          type: "SYSTEM",
+        }
+      }).catch(() => {});
+    }
+  }
+
+  return result;
 };
 
 // ─── Booking Status Update ──────────────────────────────────────────
