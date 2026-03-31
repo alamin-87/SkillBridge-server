@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Your Session Meeting Link - SkillBridge</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f6f8; color: #333; line-height: 1.6; margin: 0; padding: 0; }
+        .container { max-width: 600px; margin: 30px auto; background-color: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        .header { background: linear-gradient(135deg, #6C63FF 0%, #43C6AC 100%); color: white; padding: 30px; text-align: center; }
+        .header h1 { font-size: 24px; margin: 0; }
+        .content { padding: 30px; }
+        .greeting { font-size: 18px; font-weight: 600; margin-bottom: 20px; }
+        .details-box { background-color: #f9f9f9; padding: 20px; border-radius: 6px; margin: 20px 0; border-left: 4px solid #6C63FF; }
+        .btn { display: inline-block; background-color: #0F9D58; color: white; padding: 12px 30px; border-radius: 4px; text-decoration: none; font-weight: bold; margin-top: 15px; }
+        .footer { background-color: #f9f9f9; padding: 20px; text-align: center; font-size: 12px; color: #666; border-top: 1px solid #eee; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Session Meeting Link</h1>
+        </div>
+        <div class="content">
+            <div class="greeting">Hello <%= userName || 'User' %>,</div>
+            <p>The 1-on-1 tutoring session has been fully confirmed. Below is the unique Google Meet link that will be used for this session.</p>
+            
+            <div class="details-box">
+                <p><strong>Subject:</strong> <%= courseName %></p>
+                <% if (typeof partnerName !== 'undefined') { %>
+                <p><strong>With:</strong> <%= partnerName %></p>
+                <% } %>
+            </div>
+
+            <div style="text-align: center; margin: 30px 0;">
+                <p style="font-size: 14px; color: #555; margin-bottom: 15px;">Click the button below to join your session at the scheduled time:</p>
+                <a href="<%= meetingLink %>" class="btn">Join Google Meet</a>
+                <p style="margin-top: 15px; font-size: 12px; color: #888;">Or copy link: <a href="<%= meetingLink %>" style="color: #6C63FF;"><%= meetingLink %></a></p>
+                <p style="margin-top: 5px; font-size: 12px; color: #d9534f; font-weight: 600;">Keep this link safe. Do not share it with anyone else.</p>
+            </div>
+
+            <p style="font-size: 13px; color: #555;">If you experience any issues joining, please try accessing the link from a modern browser like Google Chrome.</p>
+        </div>
+        <div class="footer">
+            <p><strong>SkillBridge</strong> | Empowering Skills, Bridging Careers</p>
+            <p>This is an automatically generated email. Please do not reply.</p>
+        </div>
+    </div>
+</body>
+</html>

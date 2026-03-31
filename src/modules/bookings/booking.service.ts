@@ -60,7 +60,12 @@ const createBooking = async (studentId: string, payload: CreateBookingPayload) =
       });
 
       const slotDurationHours = (slot.endTime.getTime() - slot.startTime.getTime()) / (1000 * 60 * 60);
-      const slotPackagePrice = tutorProfile.hourlyRate * slotDurationHours * 30; 
+      const isPackage = slot.type === "PACKAGE_30D";
+      const slotPackagePrice = tutorProfile.hourlyRate * slotDurationHours * (isPackage ? 30 : 1);
+      
+      const dynamicNotes = isPackage
+        ? `30-Day Contract: Standard fixed recurring schedule from ${start.toLocaleTimeString()} to ${end.toLocaleTimeString()} matching exactly 30 days.`
+        : `Single Session: One-time private session on ${start.toLocaleDateString()} from ${start.toLocaleTimeString()} to ${end.toLocaleTimeString()}.`;
 
       const newBooking = await tx.booking.create({
         data: {
@@ -72,7 +77,7 @@ const createBooking = async (studentId: string, payload: CreateBookingPayload) =
           scheduledEnd: slot.endTime,
           price: slotPackagePrice,
           status: "PENDING",
-          notes: thirtyDaysNotes
+          notes: dynamicNotes
         },
       });
 
@@ -80,7 +85,7 @@ const createBooking = async (studentId: string, payload: CreateBookingPayload) =
         data: {
           userId: tutorId,
           title: "New Booking Received",
-          message: `A student booked a 30-day package with your availability slot.`,
+          message: `A student booked a ${isPackage ? '30-day package' : 'single session'} with your availability slot.`,
           type: "BOOKING",
         },
       });
@@ -212,6 +217,11 @@ const cancelBooking = async (
     // Control cancellation access
     if (role !== "ADMIN" && booking.studentId !== userId && booking.tutorId !== userId) {
       throw new AppError(status.FORBIDDEN, "Not allowed to alter this booking state");
+    }
+
+    // A student cannot cancel a booking once payment is successfully closed out
+    if (role === "STUDENT" && booking.paymentStatus === "PAID") {
+      throw new AppError(status.BAD_REQUEST, "Cannot cancel a session that has already been paid and fully confirmed.");
     }
 
     // If cancellation processed prior, ignore repetitious updates

@@ -13,6 +13,8 @@
         .info-box { background-color: #f1f5f9; border-left: 4px solid #4f46e5; padding: 15px; margin: 20px 0; border-radius: 0 6px 6px 0; }
         .asset-list { list-style: none; padding: 0; }
         .asset-item { margin-bottom: 8px; font-size: 14px; }
+        .resource-link { color: #4f46e5; text-decoration: none; font-weight: 600; }
+        .resource-link:hover { text-decoration: underline; }
     </style>
 </head>
 <body>
@@ -22,28 +24,31 @@
         </div>
         <div class="content">
             <h2><%= title %></h2>
-            <p>Hello <%= studentName %>,</p>
+            <p>Hello <%= recipientName %>,</p>
             <p><%= message %></p>
             
             <div class="info-box">
                 <strong>Assignment:</strong> <%= assignmentTitle %><br>
-                <% if (grade) { %>
+                <% if (typeof grade !== 'undefined' && grade !== null && grade !== undefined) { %>
                     <strong>Grade:</strong> <%= grade %> / 100<br>
+                <% } %>
+                <% if (typeof studentName !== 'undefined' && studentName) { %>
+                    <strong>Student:</strong> <%= studentName %><br>
                 <% } %>
             </div>
 
-            <% if (files && files.length > 0) { %>
-                <h3>Attached Resources:</h3>
+            <% if (typeof files !== 'undefined' && files && files.length > 0) { %>
+                <h3>📎 Attached Resources:</h3>
                 <ul class="asset-list">
-                    <% files.map((file, idx) => { %>
+                    <% files.forEach(function(file, idx) { %>
                         <li class="asset-item">
-                            <a href="<%= file.url %>" style="color: #4f46e5;">📎 Resource <%= idx + 1 %></a>
+                            <a href="<%= file.url %>" class="resource-link">📄 <%= file.name || ('Resource ' + (idx + 1)) %></a>
                         </li>
                     <% }) %>
                 </ul>
             <% } %>
 
-            <p>Visit your dashboard to view full details and submit your work.</p>
+            <p>Visit your dashboard to view full details.</p>
             <a href="<%= dashboardUrl %>" class="btn">View Dashboard</a>
         </div>
         <div class="footer">

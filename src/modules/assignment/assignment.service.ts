@@ -66,7 +66,7 @@ export const AssignmentService = {
           subject: `New Assignment: ${title} - SkillBridge`,
           templateName: "assignment",
           templateData: {
-            studentName: studentNameToNotify || "Student",
+            recipientName: studentNameToNotify || "Student",
             title: "New Assignment Received",
             message: `Your tutor has uploaded a new assignment with attached resources.`,
             assignmentTitle: title,
@@ -170,54 +170,82 @@ export const AssignmentService = {
   ) => {
     const assignment = await prisma.assignment.findUnique({
       where: { id: assignmentId },
-      include: { booking: true },
+      include: {
+        booking: true,
+        createdBy: { select: { id: true, email: true, name: true } },
+      },
     });
 
     if (!assignment) {
-      throw new AppError(status.NOT_FOUND, "Assignment identifier does not natively exist");
+      throw new AppError(status.NOT_FOUND, "Assignment not found");
     }
 
-    // Ensure student legitimately accesses bounded bookings explicitly
+    // Ensure student legitimately accesses bounded bookings
     if (assignment.booking && assignment.booking.studentId !== studentId) {
       throw new AppError(
         status.FORBIDDEN,
-        "Unauthorized execution. Assignment strictly linked exclusively tracking another booking dynamically."
+        "You are not authorized to submit to this assignment."
       );
     }
 
-    // Process cloud storage URL mappings natively out of Multer Cloudinary configurations mapped
+    // Get student info for email
+    const student = await prisma.user.findUnique({
+      where: { id: studentId },
+      select: { name: true, email: true },
+    });
+
+    // Process cloud storage URL mappings
     const filePayloads = files.map((file: any) => ({
-      url: file.path || file.url, // Path usually bound inside Cloudinary buffers globally
+      url: file.path || file.url,
       publicId: file.filename || file.public_id,
       type: file.mimetype,
       size: file.size,
       name: file.originalname,
     }));
 
-    // Create the logical submission node
+    // Create the submission
     const submission = await prisma.assignmentSubmission.create({
       data: {
         assignmentId,
         studentId,
-        files: filePayloads as any, // Mapped natively to Prisma Json scalar universally
+        files: filePayloads as any,
         status: "SUBMITTED",
       },
     });
 
-    // Update parent assignment to display active submission triggers automatically
+    // Update parent assignment status
     await prisma.assignment.update({
       where: { id: assignmentId },
       data: { status: "SUBMITTED" },
     });
 
+    // Create in-app notification for tutor
     await prisma.notification.create({
       data: {
         userId: assignment.createdById,
         title: "Assignment Submitted",
-        message: `A student has submitted an answer sheet for assignment: ${assignment.title}`,
+        message: `${student?.name || "A student"} has submitted an answer for: ${assignment.title}`,
         type: "SYSTEM",
       },
     });
+
+    // 🔥 Send email to tutor with student's submitted resource files
+    if (assignment.createdBy?.email) {
+      await sendEmail({
+        to: assignment.createdBy.email,
+        subject: `Assignment Submitted: ${assignment.title} - SkillBridge`,
+        templateName: "assignment",
+        templateData: {
+          recipientName: assignment.createdBy.name || "Tutor",
+          title: "Student Assignment Submission",
+          message: `${student?.name || "A student"} has submitted their answer for your assignment. You can review the attached resources and grade the submission from your dashboard.`,
+          assignmentTitle: assignment.title,
+          studentName: student?.name || "Student",
+          files: filePayloads || [],
+          dashboardUrl: `${envVars.FRONTEND_URL}/tutor/dashboard/assignments`,
+        }
+      }).catch(console.error);
+    }
 
     return submission;
   },
@@ -299,9 +327,9 @@ export const AssignmentService = {
           subject: `Assignment Evaluated: ${assignment.title} - SkillBridge`,
           templateName: "assignment",
           templateData: {
-            studentName: submission.student.name,
+            recipientName: submission.student.name || "Student",
             title: "Evaluation Complete",
-            message: `Your assignment has been graded. A professional evaluation report is available for download.`,
+            message: `Your assignment has been graded. You can view the evaluation report from your dashboard.`,
             assignmentTitle: assignment.title,
             grade: grade,
             files: reportData ? [reportData] : [],

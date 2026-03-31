@@ -9,6 +9,10 @@ SkillBridge Server is a Node.js/Express-based REST API built with modern technol
 - **Student-Tutor Matchmaking**: Students can browse and book tutors based on categories and availability
 - **Authentication**: Secure user authentication with email/password and Google OAuth integration
 - **Booking System**: Manage tutoring sessions with scheduling and status tracking
+- **Payment Processing**: Full Stripe integration supporting intent creation and webhooks in BDT
+- **Assignment System**: Tutors create tasks, students upload PDF solutions (via Cloudinary), and tutors evaluate them
+- **Automated Scheduling**: Cron jobs to automatically dispatch session reminders and Google Meet links 5 minutes prior to start times
+- **Notification Engine**: System alerts, broadcasts, and transactional emails
 - **Ratings & Reviews**: Students can rate and review their tutors
 - **Admin Management**: Administrative controls for user management and moderation
 - **Availability Management**: Tutors can set their availability slots
@@ -21,6 +25,10 @@ SkillBridge Server is a Node.js/Express-based REST API built with modern technol
 - **Language**: TypeScript 5.x
 - **Database**: PostgreSQL (via Prisma ORM)
 - **Authentication**: Better-Auth with OAuth support
+- **Payments**: Stripe API
+- **File Storage**: Cloudinary (via Multer)
+- **Emails**: Nodemailer + EJS Templates
+- **Task Scheduling**: Node-Cron
 - **Deployment**: Vercel
 - **Build Tool**: tsup
 
@@ -62,6 +70,8 @@ NODE_ENV=development
 
 # Client URL
 APP_URL=http://localhost:3000
+PROD_APP_URL=https://your-production-client.vercel.app
+FRONTEND_URL=http://localhost:3000
 
 # Google OAuth (get from Google Cloud Console)
 GOOGLE_CLIENT_ID=your_google_client_id
@@ -70,64 +80,214 @@ GOOGLE_CLIENT_SECRET=your_google_client_secret
 # Better-Auth Configuration
 BETTER_AUTH_SECRET=your_secret_key_here
 BETTER_AUTH_URL=http://localhost:5000
+
+# Email / SMTP Configuration
+EMAIL_SENDER_SMTP_USER=your_smtp_user
+EMAIL_SENDER_SMTP_PASS=your_smtp_pass
+EMAIL_SENDER_SMTP_HOST=smtp.example.com
+EMAIL_SENDER_SMTP_PORT=587
+EMAIL_SENDER_SMTP_FROM=noreply@skillbridge.com
+
+# Cloudinary Integration
+CLOUDINARY_CLOUD_NAME=your_cloud_name
+CLOUDINARY_API_KEY=your_api_key
+CLOUDINARY_API_SECRET=your_api_secret
+
+# Stripe Payments
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+
+# Admin Seeding
+SUPER_ADMIN_EMAIL=admin@skillbridge.com
+SUPER_ADMIN_PASSWORD=secure_admin_password
 ```
 
-## 📦 Project Structure
+## 📂 Full Project Folder Structure
+
+```
+SkillBridge-server/
+├── prisma/
+│   ├── migrations/
+│   └── schema/
+│       ├── activityLog.prisma
+│       ├── admin.prisma
+│       ├── assignment.prisma
+│       ├── assignmentSubmission.prisma
+│       ├── auth.prisma
+│       ├── booking.prisma
+│       ├── category.prisma
+│       ├── enums.prisma
+│       ├── notification.prisma
+│       ├── payment.prisma
+│       ├── review.prisma
+│       ├── schema.prisma
+│       └── tutorProfile.prisma
+├── src/
+│   ├── config/
+│   │   ├── cloudinary.config.ts
+│   │   ├── env.ts
+│   │   ├── multer.config.ts
+│   │   └── stripe.config.ts
+│   ├── errorHelpers/
+│   │   ├── AppError.ts
+│   │   ├── HandelPrismaError.ts
+│   │   └── HandelZodError.ts
+│   ├── interfaces/
+│   │   ├── error.interface.ts
+│   │   ├── index.d.ts
+│   │   ├── query.interface.ts
+│   │   └── requestUser.interface.ts
+│   ├── lib/
+│   │   ├── auth.ts
+│   │   └── prisma.ts
+│   ├── middleware/
+│   │   ├── checkAuth.ts
+│   │   ├── GlobalErrorHandeler.ts
+│   │   ├── NotFound.ts
+│   │   └── validateRequest.ts
+│   ├── modules/
+│   │   ├── admin/
+│   │   │   ├── admin.controller.ts
+│   │   │   ├── admin.route.ts
+│   │   │   └── admin.service.ts
+│   │   ├── assignment/
+│   │   │   ├── assignment.controller.ts
+│   │   │   ├── assignment.route.ts
+│   │   │   └── assignment.service.ts
+│   │   ├── auth/
+│   │   │   ├── auth.controller.ts
+│   │   │   ├── auth.interface.ts
+│   │   │   ├── auth.routes.ts
+│   │   │   ├── auth.service.ts
+│   │   │   └── auth.validation.ts
+│   │   ├── availability/
+│   │   │   ├── availability.controller.ts
+│   │   │   ├── availability.route.ts
+│   │   │   └── availability.service.ts
+│   │   ├── bookings/
+│   │   │   ├── booking.controller.ts
+│   │   │   ├── booking.route.ts
+│   │   │   └── booking.service.ts
+│   │   ├── Categories/
+│   │   │   ├── category.controller.ts
+│   │   │   ├── category.route.ts
+│   │   │   └── category.service.ts
+│   │   ├── notification/
+│   │   │   ├── notification.controller.ts
+│   │   │   ├── notification.route.ts
+│   │   │   └── notification.service.ts
+│   │   ├── payment/
+│   │   │   ├── payment.controller.ts
+│   │   │   ├── payment.route.ts
+│   │   │   └── payment.service.ts
+│   │   ├── reviews/
+│   │   │   ├── review.controller.ts
+│   │   │   ├── review.route.ts
+│   │   │   └── review.service.ts
+│   │   ├── scheduler/
+│   │   │   └── scheduler.service.ts
+│   │   ├── stats/
+│   │   │   ├── stats.controller.ts
+│   │   │   ├── stats.route.ts
+│   │   │   └── stats.service.ts
+│   │   ├── tutors/
+│   │   │   ├── tutor.interface.ts
+│   │   │   ├── tutorCategory.controller.ts
+│   │   │   ├── tutorCategory.route.ts
+│   │   │   ├── tutorCategory.service.ts
+│   │   │   ├── tutorCategory.validation.ts
+│   │   │   ├── tutorRequest.controller.ts
+│   │   │   ├── tutorRequest.route.ts
+│   │   │   ├── tutorRequest.service.ts
+│   │   │   ├── tutorRequest.validation.ts
+│   │   │   ├── tutors.controller.ts
+│   │   │   ├── tutors.route.ts
+│   │   │   └── tutors.service.ts
+│   │   └── users/
+│   │       ├── user.controller.ts
+│   │       ├── user.interface.ts
+│   │       ├── user.route.ts
+│   │       ├── user.service.ts
+│   │       └── user.validation.ts
+│   ├── routers/
+│   │   └── index.ts
+│   ├── scripts/
+│   │   └── seedAdmin.ts
+│   ├── shared/
+│   │   ├── catchAsync.ts
+│   │   └── sendResponse.ts
+│   ├── templates/
+│   │   ├── assignment.ejs
+│   │   ├── googleRedirect.ejs
+│   │   ├── invoice.ejs
+│   │   ├── otp.ejs
+│   │   ├── sessionLink.ejs
+│   │   ├── tutorApprovalEmail.ejs
+│   │   └── tutorRejectionEmail.ejs
+│   ├── types/
+│   │   └── user/
+│   │       └── userType.ts
+│   ├── utils/
+│   │   ├── deleteUploadedFilesFromGlobalErrorHandler.ts
+│   │   ├── email.ts
+│   │   └── QueryBuilder.ts
+│   ├── app.ts
+│   ├── index.ts
+│   ├── server.ts
+│   └── test-verification.ts
+├── package.json
+├── package-lock.json
+├── tsconfig.json
+└── .env
+```
+
+## 📦 Detailed Folder Descriptions
 
 ```
 src/
 ├── app.ts                          # Express app configuration
 ├── index.ts                        # Entry point
 ├── server.ts                       # Server startup logic
+├── config/                         # Env, Cloudinary, Multer, Stripe configs
+├── errorHelpers/                   # custom AppError, Zod/Prisma Handlers
 ├── lib/
-│   ├── auth.ts                    # Better-Auth configuration
-│   └── prisma.ts                  # Prisma client setup
+│   ├── auth.ts                     # Better-Auth configuration
+│   └── prisma.ts                   # Prisma client setup
 ├── middleware/
-│   ├── auth.ts                    # Authentication middleware
-│   ├── GlobalErrorHandeler.ts     # Global error handling
-│   └── NotFound.ts                # 404 handler
+│   ├── checkAuth.ts                # Authentication & Role checking
+│   ├── GlobalErrorHandeler.ts      # Global error handling
+│   └── NotFound.ts                 # 404 handler
+├── templates/                      # EJS transactional email templates
 └── modules/
-    ├── users/                     # User management module
-    │   ├── user.controller.ts
-    │   ├── user.route.ts
-    │   └── user.service.ts
-    ├── tutors/                    # Tutor management module
-    │   ├── tutors.controller.ts
-    │   ├── tutors.route.ts
-    │   ├── tutors.service.ts
-    │   ├── tutorCategory.controller.ts
-    │   ├── tutorCategory.route.ts
-    │   └── tutorCategory.service.ts
-    ├── bookings/                  # Booking management module
-    │   ├── booking.controller.ts
-    │   ├── booking.route.ts
-    │   └── booking.service.ts
-    ├── availability/              # Availability scheduling module
-    │   ├── availability.controller.ts
-    │   ├── availability.route.ts
-    │   └── availability.service.ts
-    ├── reviews/                   # Review system module
-    │   ├── review.controller.ts
-    │   ├── review.route.ts
-    │   └── review.service.ts
-    ├── Categories/                # Category management module
-    │   ├── category.controller.ts
-    │   ├── category.route.ts
-    │   └── category.service.ts
-    └── admin/                     # Admin controls module
-        ├── admin.controller.ts
-        ├── admin.route.ts
-        └── admin.service.ts
+    ├── admin/                      # High-level moderation & platform stats
+    ├── assignment/                 # Assignment Creation, Submissions & Evaluation
+    ├── auth/                       # Better-Auth integration and overrides
+    ├── availability/               # Scheduling module for Tutor Slots
+    ├── bookings/                   # Session matchmaking and lifecycles
+    ├── Categories/                 # Expertise taxonomies
+    ├── notification/               # Standardized alerts & broadcasting
+    ├── payment/                    # Stripe intents and webhook synchronization
+    ├── reviews/                    # Tutor rating engine
+    ├── scheduler/                  # node-cron tasks (Session Reminders)
+    ├── stats/                      # Aggregated analytics logic
+    ├── tutors/                     # Tutor management, validations
+    └── users/                      # Standard User CRUD operations
 
 prisma/
 ├── schema/
-│   ├── schema.prisma              # Main Prisma schema
-│   ├── auth.prisma                # Authentication models
-│   ├── booking.prisma             # Booking models
-│   ├── category.prisma            # Category models
-│   ├── review.prisma              # Review models
-│   └── tutorProfile.prisma        # Tutor models
-└── migrations/                    # Database migrations
+│   ├── schema.prisma               # Main Prisma file aggregating sub-schemas
+│   ├── activityLog.prisma          # Track activity actions
+│   ├── admin.prisma                # Admin-specific constructs
+│   ├── assignment.prisma           # Assignments & Submission schemas
+│   ├── auth.prisma                 # Authentication models
+│   ├── booking.prisma              # Booking models
+│   ├── category.prisma             # Category models
+│   ├── enums.prisma                # Shared enum types
+│   ├── notification.prisma         # System alerts
+│   ├── payment.prisma              # Stripe payment mappings
+│   ├── review.prisma               # Review models
+│   └── tutorProfile.prisma         # Tutor models
+└── migrations/                     # Database migrations
 ```
 
 ## 🗄️ Database Schema
@@ -144,6 +304,10 @@ prisma/
 - **TutorCategory**: Many-to-many relationship between tutors and categories
 - **Review**: Student reviews and ratings for tutors
 - **Verification**: Email/identity verification
+- **Payment**: Financial transaction audits mapping bookings to Stripe IDs
+- **Assignment**: Orchestrating task handouts
+- **AssignmentSubmission**: Orchestrating student graded returns
+- **Notification**: User-specific or broadcasted alert logs
 
 ### User Roles
 
@@ -245,6 +409,26 @@ Creates an initial admin user in the database for testing.
 - `DELETE /api/admin/users/:id` - Delete user
 - Additional admin operations for system management
 
+### Payments
+
+- `POST /api/payments/create-payment-intent` - Provision Stripe interactions payload
+- `POST /api/payments/webhook` - Stripe webhook event listener (Bypasses express JSON parsing)
+- `POST /api/payments/sync` - Fallback intent syncing from Stripe APIs
+
+### Assignments
+
+- `POST /api/assignments` - Tutor task creations
+- `POST /api/assignments/:id/submit` - Student assignment submission
+
+### Notifications
+
+- `GET /api/notifications` - Retrieve alerts
+- `PATCH /api/notifications/:id/read` - Mark alert as read
+
+### Stats
+
+- `GET /api/stats/overview` - Fetch platform usage statistics
+
 ## 🔐 Authentication & CORS
 
 The application uses:
@@ -270,6 +454,9 @@ The application uses:
 | `APP_URL` | Client application URL | `https://app.example.com` |
 | `GOOGLE_CLIENT_ID` | Google OAuth client ID | `xxx.apps.googleusercontent.com` |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth secret | `xxxxx` |
+| `STRIPE_SECRET_KEY` | Stripe Payments | `sk_test_...` |
+| `CLOUDINARY_CLOUD_NAME` | Media Hosting | `mycloud` |
+| `EMAIL_SENDER_SMTP_HOST` | Transactional Mails | `smtp.example.com` |
 
 ## 🔄 Database Migrations
 
@@ -381,6 +568,6 @@ For issues and questions:
 
 ---
 
-**Last Updated**: February 8, 2026  
+**Last Updated**: March 31, 2026  
 **Maintainer**: alamin-87  
 **Repository**: https://github.com/alamin-87/SkillBridge-server

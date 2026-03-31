@@ -1949,7 +1949,9 @@ var createBooking = async (studentId, payload) => {
         data: { isBooked: true }
       });
       const slotDurationHours = (slot.endTime.getTime() - slot.startTime.getTime()) / (1e3 * 60 * 60);
-      const slotPackagePrice = tutorProfile.hourlyRate * slotDurationHours * 30;
+      const isPackage = slot.type === "PACKAGE_30D";
+      const slotPackagePrice = tutorProfile.hourlyRate * slotDurationHours * (isPackage ? 30 : 1);
+      const dynamicNotes = isPackage ? `30-Day Contract: Standard fixed recurring schedule from ${start.toLocaleTimeString()} to ${end.toLocaleTimeString()} matching exactly 30 days.` : `Single Session: One-time private session on ${start.toLocaleDateString()} from ${start.toLocaleTimeString()} to ${end.toLocaleTimeString()}.`;
       const newBooking = await tx.booking.create({
         data: {
           studentId,
@@ -1960,14 +1962,14 @@ var createBooking = async (studentId, payload) => {
           scheduledEnd: slot.endTime,
           price: slotPackagePrice,
           status: "PENDING",
-          notes: thirtyDaysNotes
+          notes: dynamicNotes
         }
       });
       await tx.notification.create({
         data: {
           userId: tutorId,
           title: "New Booking Received",
-          message: `A student booked a 30-day package with your availability slot.`,
+          message: `A student booked a ${isPackage ? "30-day package" : "single session"} with your availability slot.`,
           type: "BOOKING"
         }
       });
@@ -2072,6 +2074,9 @@ var cancelBooking = async (bookingId, userId, role, reason) => {
     if (!booking) throw new AppError_default(status8.NOT_FOUND, "Target booking could not be located");
     if (role !== "ADMIN" && booking.studentId !== userId && booking.tutorId !== userId) {
       throw new AppError_default(status8.FORBIDDEN, "Not allowed to alter this booking state");
+    }
+    if (role === "STUDENT" && booking.paymentStatus === "PAID") {
+      throw new AppError_default(status8.BAD_REQUEST, "Cannot cancel a session that has already been paid and fully confirmed.");
     }
     if (booking.status === "CANCELLED") return booking;
     if (booking.availabilityId) {
@@ -5596,7 +5601,8 @@ var stripe = new Stripe(envVars.STRIPE.STRIPE_SECRET_KEY);
 
 // src/modules/payment/payment.service.ts
 var processSuccessfulPayment = async (internalPaymentId, bookingId, amount) => {
-  const meetingLink = `https://meet.jit.si/SkillBridge-${bookingId.slice(-8)}`;
+  const meetCode = `${bookingId.slice(0, 3)}-${bookingId.slice(3, 7)}-${bookingId.slice(7, 10)}`;
+  const meetingLink = `https://meet.google.com/${meetCode.toLowerCase()}`;
   const result = await prisma.$transaction(async (tx) => {
     const payment = await tx.payment.findUnique({
       where: { id: internalPaymentId },
@@ -5664,8 +5670,7 @@ var processSuccessfulPayment = async (internalPaymentId, bookingId, amount) => {
       subject: "Payment Invoice & Session Confirmation - SkillBridge",
       templateName: "invoice",
       templateData: {
-        ...invoiceData,
-        notes: `Your private session is confirmed. Link: ${meetingLink}`
+        ...invoiceData
       }
     }).catch(console.error);
     await sendEmail({
@@ -5676,7 +5681,29 @@ var processSuccessfulPayment = async (internalPaymentId, bookingId, amount) => {
         ...invoiceData,
         studentName: tutor.name,
         courseName: `1-on-1 Tutoring Session booked by ${student.name}`,
-        notes: `New booking confirmed. Meeting Link: ${meetingLink}`
+        isTutor: true
+      }
+    }).catch(console.error);
+    await sendEmail({
+      to: student.email,
+      subject: "Your Session Meeting Link - SkillBridge",
+      templateName: "sessionLink",
+      templateData: {
+        userName: student.name,
+        courseName: `1-on-1 Tutoring Session`,
+        partnerName: tutor.name,
+        meetingLink
+      }
+    }).catch(console.error);
+    await sendEmail({
+      to: tutor.email,
+      subject: "Your Session Meeting Link (Student Booked) - SkillBridge",
+      templateName: "sessionLink",
+      templateData: {
+        userName: tutor.name,
+        courseName: `1-on-1 Tutoring Session`,
+        partnerName: student.name,
+        meetingLink
       }
     }).catch(console.error);
   }
@@ -6070,7 +6097,7 @@ var AssignmentService = {
           subject: `New Assignment: ${title} - SkillBridge`,
           templateName: "assignment",
           templateData: {
-            studentName: studentNameToNotify || "Student",
+            recipientName: studentNameToNotify || "Student",
             title: "New Assignment Received",
             message: `Your tutor has uploaded a new assignment with attached resources.`,
             assignmentTitle: title,
@@ -6155,20 +6182,26 @@ var AssignmentService = {
   submitAssignment: async (assignmentId, studentId, files) => {
     const assignment = await prisma.assignment.findUnique({
       where: { id: assignmentId },
-      include: { booking: true }
+      include: {
+        booking: true,
+        createdBy: { select: { id: true, email: true, name: true } }
+      }
     });
     if (!assignment) {
-      throw new AppError_default(status28.NOT_FOUND, "Assignment identifier does not natively exist");
+      throw new AppError_default(status28.NOT_FOUND, "Assignment not found");
     }
     if (assignment.booking && assignment.booking.studentId !== studentId) {
       throw new AppError_default(
         status28.FORBIDDEN,
-        "Unauthorized execution. Assignment strictly linked exclusively tracking another booking dynamically."
+        "You are not authorized to submit to this assignment."
       );
     }
+    const student = await prisma.user.findUnique({
+      where: { id: studentId },
+      select: { name: true, email: true }
+    });
     const filePayloads = files.map((file) => ({
       url: file.path || file.url,
-      // Path usually bound inside Cloudinary buffers globally
       publicId: file.filename || file.public_id,
       type: file.mimetype,
       size: file.size,
@@ -6179,7 +6212,6 @@ var AssignmentService = {
         assignmentId,
         studentId,
         files: filePayloads,
-        // Mapped natively to Prisma Json scalar universally
         status: "SUBMITTED"
       }
     });
@@ -6191,10 +6223,26 @@ var AssignmentService = {
       data: {
         userId: assignment.createdById,
         title: "Assignment Submitted",
-        message: `A student has submitted an answer sheet for assignment: ${assignment.title}`,
+        message: `${student?.name || "A student"} has submitted an answer for: ${assignment.title}`,
         type: "SYSTEM"
       }
     });
+    if (assignment.createdBy?.email) {
+      await sendEmail({
+        to: assignment.createdBy.email,
+        subject: `Assignment Submitted: ${assignment.title} - SkillBridge`,
+        templateName: "assignment",
+        templateData: {
+          recipientName: assignment.createdBy.name || "Tutor",
+          title: "Student Assignment Submission",
+          message: `${student?.name || "A student"} has submitted their answer for your assignment. You can review the attached resources and grade the submission from your dashboard.`,
+          assignmentTitle: assignment.title,
+          studentName: student?.name || "Student",
+          files: filePayloads || [],
+          dashboardUrl: `${envVars.FRONTEND_URL}/tutor/dashboard/assignments`
+        }
+      }).catch(console.error);
+    }
     return submission;
   },
   evaluateSubmission: async (assignmentId, submissionId, tutorId, grade, feedback, reportFile) => {
@@ -6254,9 +6302,9 @@ var AssignmentService = {
           subject: `Assignment Evaluated: ${assignment.title} - SkillBridge`,
           templateName: "assignment",
           templateData: {
-            studentName: submission.student.name,
+            recipientName: submission.student.name || "Student",
             title: "Evaluation Complete",
-            message: `Your assignment has been graded. A professional evaluation report is available for download.`,
+            message: `Your assignment has been graded. You can view the evaluation report from your dashboard.`,
             assignmentTitle: assignment.title,
             grade,
             files: reportData ? [reportData] : [],

@@ -8,7 +8,9 @@ import { sendEmail } from "../../utils/email";
 
 // Helper function to process fully confirmed payments
 const processSuccessfulPayment = async (internalPaymentId: string, bookingId: string, amount: number) => {
-  const meetingLink = `https://meet.jit.si/SkillBridge-${bookingId.slice(-8)}`;
+  // Generate a Google Meet style link format (xxx-xxxx-xxx)
+  const meetCode = `${bookingId.slice(0, 3)}-${bookingId.slice(3, 7)}-${bookingId.slice(7, 10)}`;
+  const meetingLink = `https://meet.google.com/${meetCode.toLowerCase()}`;
 
   const result = await prisma.$transaction(async (tx) => {
     // 1. Fetch full details including users for emailing
@@ -91,8 +93,7 @@ const processSuccessfulPayment = async (internalPaymentId: string, bookingId: st
       subject: "Payment Invoice & Session Confirmation - SkillBridge",
       templateName: "invoice",
       templateData: {
-        ...invoiceData,
-        notes: `Your private session is confirmed. Link: ${meetingLink}`
+        ...invoiceData
       },
     }).catch(console.error);
 
@@ -105,7 +106,33 @@ const processSuccessfulPayment = async (internalPaymentId: string, bookingId: st
         ...invoiceData,
         studentName: tutor.name,
         courseName: `1-on-1 Tutoring Session booked by ${student.name}`,
-        notes: `New booking confirmed. Meeting Link: ${meetingLink}`
+        isTutor: true
+      },
+    }).catch(console.error);
+
+    // Send Dedicated Google Meet Link to Student
+    await sendEmail({
+      to: student.email,
+      subject: "Your Session Meeting Link - SkillBridge",
+      templateName: "sessionLink",
+      templateData: {
+        userName: student.name,
+        courseName: `1-on-1 Tutoring Session`,
+        partnerName: tutor.name,
+        meetingLink: meetingLink,
+      },
+    }).catch(console.error);
+
+    // Send Dedicated Google Meet Link to Tutor
+    await sendEmail({
+      to: tutor.email,
+      subject: "Your Session Meeting Link (Student Booked) - SkillBridge",
+      templateName: "sessionLink",
+      templateData: {
+        userName: tutor.name,
+        courseName: `1-on-1 Tutoring Session`,
+        partnerName: student.name,
+        meetingLink: meetingLink,
       },
     }).catch(console.error);
   }
@@ -171,7 +198,7 @@ const createPaymentIntent = async (bookingId: string, studentId: string) => {
   // Generate Stripe Intent passing vital tracking Metadata identifiers
   const paymentIntent = await stripe.paymentIntents.create({
     amount: paymentAmountCents,
-    currency: "usd", // Modify dynamically if platform scales internationally
+    currency: "bdt", // Set to BDT for Bangladesh region compatibility
     payment_method_types: ["card"],
     receipt_email: booking.student.email,
     metadata: {

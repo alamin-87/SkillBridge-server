@@ -201,7 +201,11 @@
             </div>
 
             <p style="margin-bottom: 20px; color: #555; font-size: 14px;">
-                Your payment for the selected SkillBridge course has been successfully processed. Below is your payment invoice.
+                <% if (typeof isTutor !== 'undefined' && isTutor) { %>
+                    A student has successfully booked a private 1-on-1 session with you and the payment process is complete. Your booking insights are below.
+                <% } else { %>
+                    Your payment for the selected SkillBridge course has been successfully processed. Below is your payment invoice.
+                <% } %>
             </p>
 
             <!-- Invoice Details -->
@@ -255,9 +259,11 @@
                 ✓ Payment Confirmed
             </div>
 
+
+
             <!-- Download Invoice -->
             <div class="download-section">
-                <% if (invoiceUrl) { %>
+                <% if (typeof invoiceUrl !== 'undefined' && invoiceUrl) { %>
                     <a href="<%= invoiceUrl %>" class="download-btn">Download Invoice PDF</a>
                 <% } else { %>
                     <p style="color: #555; font-size: 13px;">Invoice PDF will be available soon.</p>
