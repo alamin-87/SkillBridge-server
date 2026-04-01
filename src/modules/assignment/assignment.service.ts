@@ -56,7 +56,7 @@ export const AssignmentService = {
           userId: studentIdToNotify,
           title: "New Assignment Received",
           message: `Your tutor has posted a new task: ${title}. ${filePayloads ? "Reference PDFs attached." : ""}`,
-          type: "SYSTEM"
+          type: "ASSIGNMENT"
         }
       });
 
@@ -97,11 +97,11 @@ export const AssignmentService = {
         include: {
           submissions: { 
             include: {
-              student: { select: { name: true, email: true, image: true } }
+              student: { select: { id: true, name: true, email: true, image: true } }
             },
             orderBy: { createdAt: "desc" }
           },
-          booking: { include: { student: { select: { name: true, email: true } } } },
+          booking: { include: { student: { select: { id: true, name: true, email: true } } } },
         },
         orderBy: { createdAt: "desc" },
       });
@@ -225,7 +225,7 @@ export const AssignmentService = {
         userId: assignment.createdById,
         title: "Assignment Submitted",
         message: `${student?.name || "A student"} has submitted an answer for: ${assignment.title}`,
-        type: "SYSTEM",
+        type: "ASSIGNMENT",
       },
     });
 
@@ -317,7 +317,7 @@ export const AssignmentService = {
           userId: submission.studentId,
           title: "Assignment Evaluated",
           message: `Your assignment has been graded. Score: ${grade}. ${reportData ? "Detailed PDF report attached." : ""}`,
-          type: "SYSTEM",
+          type: "ASSIGNMENT",
         },
       });
 
@@ -340,5 +340,43 @@ export const AssignmentService = {
 
       return evaluated;
     });
+  },
+
+  deleteAssignment: async (assignmentId: string, tutorId: string) => {
+    const assignment = await prisma.assignment.findUnique({
+      where: { id: assignmentId },
+    });
+
+    if (!assignment) {
+      throw new AppError(status.NOT_FOUND, "Assignment not found");
+    }
+
+    if (assignment.createdById !== tutorId) {
+      throw new AppError(status.FORBIDDEN, "You are not authorized to delete this assignment.");
+    }
+
+    // Delete the assignment
+    const result = await prisma.assignment.delete({
+      where: { id: assignmentId },
+    });
+
+    // If bound to a booking, notify the student
+    if (assignment.bookingId) {
+      const booking = await prisma.booking.findUnique({
+        where: { id: assignment.bookingId },
+      });
+      if (booking) {
+        await prisma.notification.create({
+          data: {
+            userId: booking.studentId,
+            title: "Assignment Removed",
+            message: `Your tutor has removed the assignment: ${assignment.title}.`,
+            type: "ASSIGNMENT",
+          },
+        }).catch(() => {});
+      }
+    }
+
+    return result;
   },
 };

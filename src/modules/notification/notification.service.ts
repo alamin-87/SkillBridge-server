@@ -1,7 +1,7 @@
 import { prisma } from "../../lib/prisma";
 import AppError from "../../errorHelpers/AppError";
 import status from "http-status";
-type NotificationType = "BOOKING" | "PAYMENT" | "SYSTEM";
+type NotificationType = "BOOKING" | "PAYMENT" | "SYSTEM" | "ASSIGNMENT";
 
 export const NotificationService = {
   // Utility handler that can be reused by Booking/Payment modules securely

@@ -121,4 +121,18 @@ export const AssignmentController = {
       data,
     });
   }),
+
+  deleteAssignment: catchAsync(async (req: Request, res: Response) => {
+    const data = await AssignmentService.deleteAssignment(
+      req.params.id as string,
+      req.user!.userId
+    );
+
+    sendResponse(res, {
+      httpStatusCode: status.OK,
+      success: true,
+      message: "Assignment successfully deleted",
+      data,
+    });
+  }),
 };

@@ -44,4 +44,11 @@ router.patch(
   AssignmentController.evaluateSubmission
 );
 
+// Delete an assignment (Tutor only)
+router.delete(
+  "/:id",
+  authMiddleWare(UserRole.TUTOR),
+  AssignmentController.deleteAssignment
+);
+
 export const AssignmentRoutes = router;

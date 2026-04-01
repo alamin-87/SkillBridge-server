@@ -1,0 +1,4 @@
+﻿src/config/cloudinary.config.ts(4,8): error TS1259: Module '"http-status"' can only be default-imported using the 'esModuleInterop' flag
+src/config/env.ts(1,8): error TS1192: Module '"F:/PH-L2-B6/Mission-5/Module-36/SkillBridge/SkillBridge-server/node_modules/dotenv/lib/main"' has no default export.
+src/config/env.ts(2,8): error TS1259: Module '"http-status"' can only be default-imported using the 'esModuleInterop' flag
+src/config/multer.config.ts(3,8): error TS1259: Module '"F:/PH-L2-B6/Mission-5/Module-36/SkillBridge/SkillBridge-server/node_modules/@types/multer/index"' can only be default-imported using the 'esModuleInterop' flag

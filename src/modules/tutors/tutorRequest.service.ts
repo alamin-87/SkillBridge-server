@@ -488,4 +488,38 @@ export const TutorService = {
   getAllTutorRequests,
   getPendingTutorRequests,
   updateTutorProfile,
+  cancelTutorRequest: async (userId: string) => {
+    const request = await prisma.tutorRequest.findFirst({
+      where: { userId, status: { in: ["PENDING", "REJECTED"] } },
+    });
+
+    if (!request) {
+      throw new AppError(status.NOT_FOUND, "No cancellable tutor request found");
+    }
+
+    return prisma.tutorRequest.delete({
+      where: { id: request.id },
+    });
+  },
+  updateMyTutorRequest: async (userId: string, payload: Partial<ITutorRequest>) => {
+    const request = await prisma.tutorRequest.findFirst({
+      where: { userId, status: { in: ["PENDING", "REJECTED"] } },
+    });
+
+    if (!request) {
+      throw new AppError(status.NOT_FOUND, "No editable tutor request found");
+    }
+
+    // Reset status to PENDING if it was REJECTED
+    const updateData: any = { ...payload };
+    if (request.status === "REJECTED") {
+      updateData.status = "PENDING";
+      updateData.rejectionReason = null;
+    }
+
+    return prisma.tutorRequest.update({
+      where: { id: request.id },
+      data: updateData,
+    });
+  },
 };

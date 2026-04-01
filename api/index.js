@@ -42,7 +42,7 @@ var config = {
   "clientVersion": "7.3.0",
   "engineVersion": "9d6ad21cbbceab97458517b147a6a09ff43aa735",
   "activeProvider": "postgresql",
-  "inlineSchema": 'model ActivityLog {\n  id String @id @default(cuid())\n\n  userId   String?\n  action   String\n  entity   String\n  entityId String?\n\n  metadata Json?\n\n  createdAt DateTime @default(now())\n\n  @@index([userId])\n  @@index([entity])\n}\n\nmodel Admin {\n  id String @id @default(uuid())\n\n  name     String\n  email    String  @unique\n  username String? @unique // \u{1F525} optional login alternative\n\n  profilePhoto  String?\n  contactNumber String?\n\n  isDeleted Boolean   @default(false)\n  deletedAt DateTime?\n\n  isActive    Boolean   @default(true) // \u{1F525} account status\n  lastLoginAt DateTime? // \u{1F525} activity tracking\n\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n\n  // \u{1F539} Relation\n  userId String @unique\n  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)\n\n  // \u{1F539} Audit (optional but powerful)\n  createdBy String?\n  updatedBy String?\n\n  // \u{1F539} Indexing\n  @@index([email])\n  @@index([isDeleted])\n  @@index([isActive])\n  @@index([createdAt])\n  @@map("admins")\n}\n\nmodel Assignment {\n  id          String           @id @default(cuid())\n  title       String\n  description String?\n  files       Json? // \u{1F525} Tutor-provided reference PDFs/files\n  status      AssignmentStatus @default(PENDING)\n\n  // Student who created/submitted the assignment\n  submissions AssignmentSubmission[]\n  createdBy   User                   @relation(fields: [createdById], references: [id], onDelete: Cascade)\n  createdById String\n\n  // Optional linked booking (if assignment is tied to a tutoring session)\n  booking   Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)\n  bookingId String?\n\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n\n  @@index([createdById])\n  @@index([status])\n}\n\nmodel AssignmentSubmission {\n  id           String     @id @default(cuid())\n  assignment   Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)\n  assignmentId String\n\n  student   User   @relation("StudentSubmissions", fields: [studentId], references: [id], onDelete: Cascade)\n  studentId String\n\n  files Json // Array of {url, publicId, type}\n\n  status     AssignmentStatus @default(PENDING)\n  grade      Float?\n  gradedBy   User?            @relation("GradedAssignments", fields: [gradedById], references: [id])\n  gradedById String?\n\n  evaluationReport Json? // \u{1F525} PDF Report from Tutor\n  feedback         String?\n\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n\n  @@index([studentId])\n  @@index([assignmentId])\n}\n\nmodel User {\n  id            String  @id\n  name          String\n  email         String\n  emailVerified Boolean @default(false)\n  image         String?\n\n  role   UserRole   @default(STUDENT)\n  phone  String?    @unique\n  status UserStatus @default(ACTIVE)\n  // tutorStatus TutorStatus @default(NONE)\n\n  // \u{1F525} NEW\n  lastLoginAt DateTime?\n  isDeleted   Boolean   @default(false)\n  deletedAt   DateTime?\n\n  createdAt         DateTime               @default(now())\n  updatedAt         DateTime               @updatedAt\n  submissions       AssignmentSubmission[] @relation("StudentSubmissions")\n  gradedAssignments AssignmentSubmission[] @relation("GradedAssignments")\n\n  sessions Session[]\n  accounts Account[]\n\n  tutorProfile    TutorProfile?\n  tutorRequests   TutorRequest[] @relation("tutorRequests")\n  admin           Admin?\n  studentBookings Booking[]      @relation("StudentBookings")\n  tutorBookings   Booking[]      @relation("TutorBookings")\n  reviewsGiven    Review[]       @relation("StudentReviews")\n  reviewsReceived Review[]       @relation("TutorReviews")\n\n  notifications Notification[]\n  payments      Payment[]\n  assignments   Assignment[]\n\n  @@unique([email])\n  @@index([role])\n  @@index([status])\n  @@map("user")\n}\n\nmodel Session {\n  id        String   @id\n  expiresAt DateTime\n  token     String\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n  ipAddress String?\n  userAgent String?\n  userId    String\n  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)\n\n  @@unique([token])\n  @@index([userId])\n  @@map("session")\n}\n\nmodel Account {\n  id                    String    @id\n  accountId             String\n  providerId            String\n  userId                String\n  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)\n  accessToken           String?\n  refreshToken          String?\n  idToken               String?\n  accessTokenExpiresAt  DateTime?\n  refreshTokenExpiresAt DateTime?\n  scope                 String?\n  password              String?\n  createdAt             DateTime  @default(now())\n  updatedAt             DateTime  @updatedAt\n\n  @@index([userId])\n  @@map("account")\n}\n\nmodel Verification {\n  id         String   @id\n  identifier String\n  value      String\n  expiresAt  DateTime\n  createdAt  DateTime @default(now())\n  updatedAt  DateTime @updatedAt\n\n  @@index([identifier])\n  @@map("verification")\n}\n\nmodel Booking {\n  id String @id @default(cuid())\n\n  student   User   @relation("StudentBookings", fields: [studentId], references: [id], onDelete: Cascade)\n  studentId String\n\n  tutor   User   @relation("TutorBookings", fields: [tutorId], references: [id], onDelete: Cascade)\n  tutorId String\n\n  tutorProfile   TutorProfile @relation(fields: [tutorProfileId], references: [id], onDelete: Cascade)\n  tutorProfileId String\n\n  availability   TutorAvailability? @relation(fields: [availabilityId], references: [id], onDelete: SetNull)\n  availabilityId String?\n\n  scheduledStart DateTime\n  scheduledEnd   DateTime\n\n  price Float\n\n  // \u{1F525} UPGRADE\n  status        BookingStatus\n  paymentStatus PaymentStatus @default(UNPAID)\n\n  meetingLink String?\n  notes       String?\n\n  cancelledById String?\n  cancelReason  String?\n\n  review      Review?\n  payment     Payment?\n  assignments Assignment[] // Link assignments created during this booking\n\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n\n  @@index([studentId])\n  @@index([tutorId])\n  @@index([status])\n  @@index([scheduledStart])\n}\n\nmodel Category {\n  id   String @id @default(cuid())\n  name String @unique\n\n  // many-to-many with tutor profiles via join table\n  tutorLinks TutorCategory[]\n\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n}\n\nenum UserRole {\n  STUDENT\n  TUTOR\n  ADMIN\n}\n\nenum UserStatus {\n  ACTIVE\n  BANNED\n  SUSPENDED\n}\n\nenum TutorStatus {\n  NONE\n  PENDING\n  APPROVED\n  REJECTED\n}\n\nenum PaymentProvider {\n  STRIPE\n}\n\nenum PaymentTransactionStatus {\n  INITIATED\n  SUCCESS\n  FAILED\n  REFUNDED\n}\n\nenum NotificationType {\n  BOOKING\n  PAYMENT\n  SYSTEM\n}\n\nenum BookingStatus {\n  PENDING\n  CONFIRMED\n  COMPLETED\n  CANCELLED\n}\n\nenum PaymentStatus {\n  UNPAID\n  PAID\n  REFUNDED\n}\n\nenum AssignmentStatus {\n  PENDING\n  SUBMITTED\n  GRADED\n}\n\nenum AvailabilityType {\n  SINGLE\n  PACKAGE_30D\n}\n\nmodel Notification {\n  id String @id @default(cuid())\n\n  userId String\n  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)\n\n  title   String\n  message String\n  type    NotificationType\n\n  isRead Boolean @default(false)\n\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n\n  @@index([userId])\n  @@index([isRead])\n}\n\nmodel Payment {\n  id String @id @default(cuid())\n\n  userId String\n  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)\n\n  bookingId String  @unique\n  booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)\n\n  amount   Float\n  provider PaymentProvider\n  status   PaymentTransactionStatus\n\n  transactionId String?\n  paymentUrl    String?\n\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n\n  @@index([userId])\n  @@index([status])\n}\n\nmodel Review {\n  id String @id @default(cuid())\n\n  booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)\n  bookingId String  @unique\n\n  student   User   @relation("StudentReviews", fields: [studentId], references: [id], onDelete: Cascade)\n  studentId String\n\n  tutor   User   @relation("TutorReviews", fields: [tutorId], references: [id], onDelete: Cascade)\n  tutorId String\n\n  rating  Int\n  comment String?\n\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n\n  @@index([tutorId])\n  @@index([rating])\n}\n\n// This is your Prisma schema file,\n// learn more about it in the docs: https://pris.ly/d/prisma-schema\n\n// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?\n// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init\n\ngenerator client {\n  provider = "prisma-client"\n  output   = "../../generated/prisma"\n}\n\ndatasource db {\n  provider = "postgresql"\n}\n\nmodel TutorProfile {\n  id     String @id @default(cuid())\n  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)\n  userId String @unique\n\n  bio           String\n  hourlyRate    Float   @default(0)\n  experienceYrs Int     @default(0)\n  location      String?\n  languages     String?\n  profileImage  String?\n  institution   String?\n\n  avgRating    Float @default(0)\n  totalReviews Int   @default(0)\n\n  // \u{1F525} NEW\n  totalEarnings Float   @default(0)\n  isApproved    Boolean @default(false)\n\n  categories   TutorCategory[]\n  availability TutorAvailability[]\n  bookings     Booking[]\n\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n\n  @@index([hourlyRate])\n  @@index([avgRating])\n}\n\nmodel TutorAvailability {\n  id             String       @id @default(cuid())\n  tutorProfile   TutorProfile @relation(fields: [tutorProfileId], references: [id], onDelete: Cascade)\n  tutorProfileId String\n\n  startTime DateTime\n  endTime   DateTime\n  isBooked  Boolean          @default(false)\n  type      AvailabilityType @default(SINGLE)\n\n  // \u2705 Opposite relation (add this)\n  bookings Booking[] // one slot can be linked to many bookings (or 1, depending on your rules)\n\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n\n  @@index([tutorProfileId])\n  @@index([startTime, endTime])\n}\n\nmodel TutorRequest {\n  id     String @id @default(cuid())\n  user   User   @relation("tutorRequests", fields: [userId], references: [id], onDelete: Cascade)\n  userId String\n\n  bio           String\n  hourlyRate    Float\n  experienceYrs Int\n  location      String?\n  languages     String?\n  institution   String?\n  categories    String[] @default([])\n\n  status          String  @default("PENDING") // PENDING, APPROVED, REJECTED\n  rejectionReason String?\n\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n\n  @@index([userId])\n  @@index([status])\n}\n\nmodel TutorCategory {\n  id             String       @id @default(cuid())\n  tutorProfile   TutorProfile @relation(fields: [tutorProfileId], references: [id], onDelete: Cascade)\n  tutorProfileId String\n  category       Category     @relation(fields: [categoryId], references: [id], onDelete: Cascade)\n  categoryId     String\n\n  @@unique([tutorProfileId, categoryId])\n  @@index([categoryId])\n}\n',
+  "inlineSchema": 'model ActivityLog {\n  id String @id @default(cuid())\n\n  userId   String?\n  action   String\n  entity   String\n  entityId String?\n\n  metadata Json?\n\n  createdAt DateTime @default(now())\n\n  @@index([userId])\n  @@index([entity])\n}\n\nmodel Admin {\n  id String @id @default(uuid())\n\n  name     String\n  email    String  @unique\n  username String? @unique // \u{1F525} optional login alternative\n\n  profilePhoto  String?\n  contactNumber String?\n\n  isDeleted Boolean   @default(false)\n  deletedAt DateTime?\n\n  isActive    Boolean   @default(true) // \u{1F525} account status\n  lastLoginAt DateTime? // \u{1F525} activity tracking\n\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n\n  // \u{1F539} Relation\n  userId String @unique\n  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)\n\n  // \u{1F539} Audit (optional but powerful)\n  createdBy String?\n  updatedBy String?\n\n  // \u{1F539} Indexing\n  @@index([email])\n  @@index([isDeleted])\n  @@index([isActive])\n  @@index([createdAt])\n  @@map("admins")\n}\n\nmodel Assignment {\n  id          String           @id @default(cuid())\n  title       String\n  description String?\n  files       Json? // \u{1F525} Tutor-provided reference PDFs/files\n  status      AssignmentStatus @default(PENDING)\n\n  // Student who created/submitted the assignment\n  submissions AssignmentSubmission[]\n  createdBy   User                   @relation(fields: [createdById], references: [id], onDelete: Cascade)\n  createdById String\n\n  // Optional linked booking (if assignment is tied to a tutoring session)\n  booking   Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)\n  bookingId String?\n\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n\n  @@index([createdById])\n  @@index([status])\n}\n\nmodel AssignmentSubmission {\n  id           String     @id @default(cuid())\n  assignment   Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)\n  assignmentId String\n\n  student   User   @relation("StudentSubmissions", fields: [studentId], references: [id], onDelete: Cascade)\n  studentId String\n\n  files Json // Array of {url, publicId, type}\n\n  status     AssignmentStatus @default(PENDING)\n  grade      Float?\n  gradedBy   User?            @relation("GradedAssignments", fields: [gradedById], references: [id])\n  gradedById String?\n\n  evaluationReport Json? // \u{1F525} PDF Report from Tutor\n  feedback         String?\n\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n\n  @@index([studentId])\n  @@index([assignmentId])\n}\n\nmodel User {\n  id            String  @id\n  name          String\n  email         String\n  emailVerified Boolean @default(false)\n  image         String?\n\n  role   UserRole   @default(STUDENT)\n  phone  String?    @unique\n  status UserStatus @default(ACTIVE)\n  // tutorStatus TutorStatus @default(NONE)\n\n  // \u{1F525} NEW\n  lastLoginAt DateTime?\n  isDeleted   Boolean   @default(false)\n  deletedAt   DateTime?\n\n  createdAt         DateTime               @default(now())\n  updatedAt         DateTime               @updatedAt\n  submissions       AssignmentSubmission[] @relation("StudentSubmissions")\n  gradedAssignments AssignmentSubmission[] @relation("GradedAssignments")\n\n  sessions Session[]\n  accounts Account[]\n\n  tutorProfile    TutorProfile?\n  tutorRequests   TutorRequest[] @relation("tutorRequests")\n  admin           Admin?\n  studentBookings Booking[]      @relation("StudentBookings")\n  tutorBookings   Booking[]      @relation("TutorBookings")\n  reviewsGiven    Review[]       @relation("StudentReviews")\n  reviewsReceived Review[]       @relation("TutorReviews")\n\n  notifications Notification[]\n  payments      Payment[]\n  assignments   Assignment[]\n\n  @@unique([email])\n  @@index([role])\n  @@index([status])\n  @@map("user")\n}\n\nmodel Session {\n  id        String   @id\n  expiresAt DateTime\n  token     String\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n  ipAddress String?\n  userAgent String?\n  userId    String\n  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)\n\n  @@unique([token])\n  @@index([userId])\n  @@map("session")\n}\n\nmodel Account {\n  id                    String    @id\n  accountId             String\n  providerId            String\n  userId                String\n  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)\n  accessToken           String?\n  refreshToken          String?\n  idToken               String?\n  accessTokenExpiresAt  DateTime?\n  refreshTokenExpiresAt DateTime?\n  scope                 String?\n  password              String?\n  createdAt             DateTime  @default(now())\n  updatedAt             DateTime  @updatedAt\n\n  @@index([userId])\n  @@map("account")\n}\n\nmodel Verification {\n  id         String   @id\n  identifier String\n  value      String\n  expiresAt  DateTime\n  createdAt  DateTime @default(now())\n  updatedAt  DateTime @updatedAt\n\n  @@index([identifier])\n  @@map("verification")\n}\n\nmodel Booking {\n  id String @id @default(cuid())\n\n  student   User   @relation("StudentBookings", fields: [studentId], references: [id], onDelete: Cascade)\n  studentId String\n\n  tutor   User   @relation("TutorBookings", fields: [tutorId], references: [id], onDelete: Cascade)\n  tutorId String\n\n  tutorProfile   TutorProfile @relation(fields: [tutorProfileId], references: [id], onDelete: Cascade)\n  tutorProfileId String\n\n  availability   TutorAvailability? @relation(fields: [availabilityId], references: [id], onDelete: SetNull)\n  availabilityId String?\n\n  scheduledStart DateTime\n  scheduledEnd   DateTime\n\n  price Float\n\n  // \u{1F525} UPGRADE\n  status        BookingStatus\n  paymentStatus PaymentStatus @default(UNPAID)\n\n  meetingLink String?\n  notes       String?\n\n  cancelledById String?\n  cancelReason  String?\n\n  review      Review?\n  payment     Payment?\n  assignments Assignment[] // Link assignments created during this booking\n\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n\n  @@index([studentId])\n  @@index([tutorId])\n  @@index([status])\n  @@index([scheduledStart])\n}\n\nmodel Category {\n  id   String @id @default(cuid())\n  name String @unique\n\n  // many-to-many with tutor profiles via join table\n  tutorLinks TutorCategory[]\n\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n}\n\nenum UserRole {\n  STUDENT\n  TUTOR\n  ADMIN\n}\n\nenum UserStatus {\n  ACTIVE\n  BANNED\n  SUSPENDED\n}\n\nenum TutorStatus {\n  NONE\n  PENDING\n  APPROVED\n  REJECTED\n}\n\nenum PaymentProvider {\n  STRIPE\n}\n\nenum PaymentTransactionStatus {\n  INITIATED\n  SUCCESS\n  FAILED\n  REFUNDED\n}\n\nenum NotificationType {\n  BOOKING\n  PAYMENT\n  SYSTEM\n  ASSIGNMENT\n}\n\nenum BookingStatus {\n  PENDING\n  CONFIRMED\n  COMPLETED\n  CANCELLED\n}\n\nenum PaymentStatus {\n  UNPAID\n  PAID\n  REFUNDED\n}\n\nenum AssignmentStatus {\n  PENDING\n  SUBMITTED\n  GRADED\n}\n\nenum AvailabilityType {\n  SINGLE\n  PACKAGE_30D\n}\n\nmodel Notification {\n  id String @id @default(cuid())\n\n  userId String\n  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)\n\n  title   String\n  message String\n  type    NotificationType\n\n  isRead Boolean @default(false)\n\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n\n  @@index([userId])\n  @@index([isRead])\n}\n\nmodel Payment {\n  id String @id @default(cuid())\n\n  userId String\n  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)\n\n  bookingId String  @unique\n  booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)\n\n  amount   Float\n  provider PaymentProvider\n  status   PaymentTransactionStatus\n\n  transactionId String?\n  paymentUrl    String?\n\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n\n  @@index([userId])\n  @@index([status])\n}\n\nmodel Review {\n  id String @id @default(cuid())\n\n  booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)\n  bookingId String  @unique\n\n  student   User   @relation("StudentReviews", fields: [studentId], references: [id], onDelete: Cascade)\n  studentId String\n\n  tutor   User   @relation("TutorReviews", fields: [tutorId], references: [id], onDelete: Cascade)\n  tutorId String\n\n  rating  Int\n  comment String?\n\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n\n  @@index([tutorId])\n  @@index([rating])\n}\n\n// This is your Prisma schema file,\n// learn more about it in the docs: https://pris.ly/d/prisma-schema\n\n// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?\n// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init\n\ngenerator client {\n  provider = "prisma-client"\n  output   = "../../generated/prisma"\n}\n\ndatasource db {\n  provider = "postgresql"\n}\n\nmodel TutorProfile {\n  id     String @id @default(cuid())\n  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)\n  userId String @unique\n\n  bio           String\n  hourlyRate    Float   @default(0)\n  experienceYrs Int     @default(0)\n  location      String?\n  languages     String?\n  profileImage  String?\n  institution   String?\n\n  avgRating    Float @default(0)\n  totalReviews Int   @default(0)\n\n  // \u{1F525} NEW\n  totalEarnings Float   @default(0)\n  isApproved    Boolean @default(false)\n\n  categories   TutorCategory[]\n  availability TutorAvailability[]\n  bookings     Booking[]\n\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n\n  @@index([hourlyRate])\n  @@index([avgRating])\n}\n\nmodel TutorAvailability {\n  id             String       @id @default(cuid())\n  tutorProfile   TutorProfile @relation(fields: [tutorProfileId], references: [id], onDelete: Cascade)\n  tutorProfileId String\n\n  startTime DateTime\n  endTime   DateTime\n  isBooked  Boolean          @default(false)\n  type      AvailabilityType @default(SINGLE)\n\n  // \u2705 Opposite relation (add this)\n  bookings Booking[] // one slot can be linked to many bookings (or 1, depending on your rules)\n\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n\n  @@index([tutorProfileId])\n  @@index([startTime, endTime])\n}\n\nmodel TutorRequest {\n  id     String @id @default(cuid())\n  user   User   @relation("tutorRequests", fields: [userId], references: [id], onDelete: Cascade)\n  userId String\n\n  bio           String\n  hourlyRate    Float\n  experienceYrs Int\n  location      String?\n  languages     String?\n  institution   String?\n  categories    String[] @default([])\n\n  status          String  @default("PENDING") // PENDING, APPROVED, REJECTED\n  rejectionReason String?\n\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n\n  @@index([userId])\n  @@index([status])\n}\n\nmodel TutorCategory {\n  id             String       @id @default(cuid())\n  tutorProfile   TutorProfile @relation(fields: [tutorProfileId], references: [id], onDelete: Cascade)\n  tutorProfileId String\n  category       Category     @relation(fields: [categoryId], references: [id], onDelete: Cascade)\n  categoryId     String\n\n  @@unique([tutorProfileId, categoryId])\n  @@index([categoryId])\n}\n',
   "runtimeDataModel": {
     "models": {},
     "enums": {},
@@ -4604,7 +4604,35 @@ var TutorService = {
   getMyTutorRequest,
   getAllTutorRequests,
   getPendingTutorRequests,
-  updateTutorProfile
+  updateTutorProfile,
+  cancelTutorRequest: async (userId) => {
+    const request = await prisma.tutorRequest.findFirst({
+      where: { userId, status: { in: ["PENDING", "REJECTED"] } }
+    });
+    if (!request) {
+      throw new AppError_default(status22.NOT_FOUND, "No cancellable tutor request found");
+    }
+    return prisma.tutorRequest.delete({
+      where: { id: request.id }
+    });
+  },
+  updateMyTutorRequest: async (userId, payload) => {
+    const request = await prisma.tutorRequest.findFirst({
+      where: { userId, status: { in: ["PENDING", "REJECTED"] } }
+    });
+    if (!request) {
+      throw new AppError_default(status22.NOT_FOUND, "No editable tutor request found");
+    }
+    const updateData = { ...payload };
+    if (request.status === "REJECTED") {
+      updateData.status = "PENDING";
+      updateData.rejectionReason = null;
+    }
+    return prisma.tutorRequest.update({
+      where: { id: request.id },
+      data: updateData
+    });
+  }
 };
 
 // src/modules/tutors/tutorRequest.controller.ts
@@ -4617,18 +4645,16 @@ var createTutor2 = catchAsync_default(async (req, res) => {
     data: result
   });
 });
-var requestToBecomeTutor2 = catchAsync_default(
-  async (req, res) => {
-    const userId = req.user?.userId;
-    const result = await TutorService.requestToBecomeTutor(userId, req.body);
-    sendResponse(res, {
-      httpStatusCode: status23.CREATED,
-      success: true,
-      message: "Tutor request submitted successfully",
-      data: result
-    });
-  }
-);
+var requestToBecomeTutor2 = catchAsync_default(async (req, res) => {
+  const userId = req.user?.userId;
+  const result = await TutorService.requestToBecomeTutor(userId, req.body);
+  sendResponse(res, {
+    httpStatusCode: status23.CREATED,
+    success: true,
+    message: "Tutor request submitted successfully",
+    data: result
+  });
+});
 var getMyTutorRequest2 = catchAsync_default(async (req, res) => {
   const userId = req.user?.userId;
   const result = await TutorService.getMyTutorRequest(userId);
@@ -4639,17 +4665,15 @@ var getMyTutorRequest2 = catchAsync_default(async (req, res) => {
     data: result
   });
 });
-var getAllTutorRequests2 = catchAsync_default(
-  async (_req, res) => {
-    const result = await TutorService.getAllTutorRequests();
-    sendResponse(res, {
-      httpStatusCode: status23.OK,
-      success: true,
-      message: "Tutor requests fetched successfully",
-      data: result
-    });
-  }
-);
+var getAllTutorRequests2 = catchAsync_default(async (_req, res) => {
+  const result = await TutorService.getAllTutorRequests();
+  sendResponse(res, {
+    httpStatusCode: status23.OK,
+    success: true,
+    message: "Tutor requests fetched successfully",
+    data: result
+  });
+});
 var getPendingTutorRequests2 = catchAsync_default(
   async (_req, res) => {
     const result = await TutorService.getPendingTutorRequests();
@@ -4700,6 +4724,26 @@ var updateTutorProfile2 = catchAsync_default(async (req, res) => {
     data: result
   });
 });
+var cancelTutorRequest = catchAsync_default(async (req, res) => {
+  const userId = req.user?.userId;
+  const result = await TutorService.cancelTutorRequest(userId);
+  sendResponse(res, {
+    httpStatusCode: status23.OK,
+    success: true,
+    message: "Tutor request cancelled successfully",
+    data: result
+  });
+});
+var updateMyTutorRequest = catchAsync_default(async (req, res) => {
+  const userId = req.user?.userId;
+  const result = await TutorService.updateMyTutorRequest(userId, req.body);
+  sendResponse(res, {
+    httpStatusCode: status23.OK,
+    success: true,
+    message: "Tutor request updated successfully",
+    data: result
+  });
+});
 var TutorRequestController = {
   createTutor: createTutor2,
   requestToBecomeTutor: requestToBecomeTutor2,
@@ -4708,7 +4752,9 @@ var TutorRequestController = {
   getPendingTutorRequests: getPendingTutorRequests2,
   approveTutorRequest: approveTutorRequest2,
   rejectTutorRequest: rejectTutorRequest2,
-  updateTutorProfile: updateTutorProfile2
+  updateTutorProfile: updateTutorProfile2,
+  cancelTutorRequest,
+  updateMyTutorRequest
 };
 
 // src/modules/tutors/tutorRequest.validation.ts
@@ -4807,6 +4853,16 @@ router10.patch(
   ]),
   validateRequest(updateTutorValidation),
   TutorRequestController.updateTutorProfile
+);
+router10.delete(
+  "/my-request",
+  checkAuth_default(),
+  TutorRequestController.cancelTutorRequest
+);
+router10.patch(
+  "/my-request",
+  checkAuth_default(),
+  TutorRequestController.updateMyTutorRequest
 );
 var TutorRequestRoutes = router10;
 
@@ -5753,8 +5809,8 @@ var createPaymentIntent = async (bookingId, studentId) => {
   const paymentAmountCents = Math.round(booking.price * 100);
   const paymentIntent = await stripe.paymentIntents.create({
     amount: paymentAmountCents,
-    currency: "usd",
-    // Modify dynamically if platform scales internationally
+    currency: "bdt",
+    // Set to BDT for Bangladesh region compatibility
     payment_method_types: ["card"],
     receipt_email: booking.student.email,
     metadata: {
@@ -6088,7 +6144,7 @@ var AssignmentService = {
           userId: studentIdToNotify,
           title: "New Assignment Received",
           message: `Your tutor has posted a new task: ${title}. ${filePayloads ? "Reference PDFs attached." : ""}`,
-          type: "SYSTEM"
+          type: "ASSIGNMENT"
         }
       });
       if (studentEmailToNotify) {
@@ -6125,11 +6181,11 @@ var AssignmentService = {
         include: {
           submissions: {
             include: {
-              student: { select: { name: true, email: true, image: true } }
+              student: { select: { id: true, name: true, email: true, image: true } }
             },
             orderBy: { createdAt: "desc" }
           },
-          booking: { include: { student: { select: { name: true, email: true } } } }
+          booking: { include: { student: { select: { id: true, name: true, email: true } } } }
         },
         orderBy: { createdAt: "desc" }
       });
@@ -6224,7 +6280,7 @@ var AssignmentService = {
         userId: assignment.createdById,
         title: "Assignment Submitted",
         message: `${student?.name || "A student"} has submitted an answer for: ${assignment.title}`,
-        type: "SYSTEM"
+        type: "ASSIGNMENT"
       }
     });
     if (assignment.createdBy?.email) {
@@ -6293,7 +6349,7 @@ var AssignmentService = {
           userId: submission.studentId,
           title: "Assignment Evaluated",
           message: `Your assignment has been graded. Score: ${grade}. ${reportData ? "Detailed PDF report attached." : ""}`,
-          type: "SYSTEM"
+          type: "ASSIGNMENT"
         }
       });
       if (submission.student.email) {
@@ -6314,6 +6370,37 @@ var AssignmentService = {
       }
       return evaluated;
     });
+  },
+  deleteAssignment: async (assignmentId, tutorId) => {
+    const assignment = await prisma.assignment.findUnique({
+      where: { id: assignmentId }
+    });
+    if (!assignment) {
+      throw new AppError_default(status28.NOT_FOUND, "Assignment not found");
+    }
+    if (assignment.createdById !== tutorId) {
+      throw new AppError_default(status28.FORBIDDEN, "You are not authorized to delete this assignment.");
+    }
+    const result = await prisma.assignment.delete({
+      where: { id: assignmentId }
+    });
+    if (assignment.bookingId) {
+      const booking = await prisma.booking.findUnique({
+        where: { id: assignment.bookingId }
+      });
+      if (booking) {
+        await prisma.notification.create({
+          data: {
+            userId: booking.studentId,
+            title: "Assignment Removed",
+            message: `Your tutor has removed the assignment: ${assignment.title}.`,
+            type: "ASSIGNMENT"
+          }
+        }).catch(() => {
+        });
+      }
+    }
+    return result;
   }
 };
 
@@ -6416,6 +6503,18 @@ var AssignmentController = {
       message: "Instant evaluation saved securely",
       data
     });
+  }),
+  deleteAssignment: catchAsync_default(async (req, res) => {
+    const data = await AssignmentService.deleteAssignment(
+      req.params.id,
+      req.user.userId
+    );
+    sendResponse(res, {
+      httpStatusCode: status29.OK,
+      success: true,
+      message: "Assignment successfully deleted",
+      data
+    });
   })
 };
 
@@ -6448,6 +6547,11 @@ router13.patch(
   checkAuth_default("TUTOR" /* TUTOR */),
   multerUpload.array("files", 1),
   AssignmentController.evaluateSubmission
+);
+router13.delete(
+  "/:id",
+  checkAuth_default("TUTOR" /* TUTOR */),
+  AssignmentController.deleteAssignment
 );
 var AssignmentRoutes = router13;
 

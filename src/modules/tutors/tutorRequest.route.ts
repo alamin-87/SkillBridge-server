@@ -76,4 +76,18 @@ router.patch(
   TutorRequestController.updateTutorProfile
 );
 
+// ─── Cancel Tutor Request (Student) ──────────────────────────────────────────
+router.delete(
+  "/my-request",
+  authMiddleWare(),
+  TutorRequestController.cancelTutorRequest
+);
+
+// ─── Update My Tutor Request (Student) ──────────────────────────────────────
+router.patch(
+  "/my-request",
+  authMiddleWare(),
+  TutorRequestController.updateMyTutorRequest
+);
+
 export const TutorRequestRoutes = router;
